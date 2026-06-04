@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Roulette Visual Check</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      color: #111827;
+    }
+    .wrap {
+      width: 720px;
+      margin: 24px auto;
+      padding: 18px 22px 24px;
+      border: 1px solid #dfe5f2;
+      border-radius: 10px;
+      background: #fff;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .stage {
+      position: relative;
+      width: 440px;
+      margin: 0 auto;
+    }
+    #roulette-canvas {
+      width: 440px;
+      height: 440px;
+      display: block;
+    }
+    .pointer {
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ef4444;
+      font-size: 28px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+    }
+    #result {
+      margin-top: 14px;
+      color: #4453d9;
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1.35;
+      text-align: center;
+      word-break: keep-all;
+    }
+    #debug {
+      margin-top: 12px;
+      color: #526070;
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>룰렛 결과 정렬 테스트</h1>
+    <div class="stage">
+      <canvas id="roulette-canvas" width="440" height="440"></canvas>
+      <div class="pointer">▼</div>
+    </div>
+    <div id="result"></div>
+    <div id="debug"></div>
+  </div>
+  <script src="../js/roulette.js?v=11"></script>
+  <script>
+    const items = [
+      { id: 'a', name: '삼성원' },
+      { id: 'b', name: '무궁화반점 종로점' },
+      { id: 'c', name: '제주본가 종로5가점' },
+      { id: 'd', name: '승우네식당' },
+      { id: 'e', name: '종각상회' },
+    ];
+    Roulette.init('roulette-canvas');
+    Roulette.setItems(items);
+    const session = {
+      id: 'visual-check',
+      winnerId: 'c',
+      winnerName: '무궁화반점 종로점',
+      durationMs: 8000,
+      startAt: Date.now() - 9000,
+      spinTurns: 6,
+      startRotation: 0,
+    };
+    Roulette.settle(session);
+    document.getElementById('result').textContent =
+      `🎉 오늘은 "${Roulette.getDisplayWinner(session)}" 입니다!`;
+    document.getElementById('debug').textContent =
+      `포인터 칸: ${Roulette.getPointerWinner().name} / 표시 문구: ${Roulette.getDisplayWinner(session)}`;
+  </script>
+</body>
+</html>

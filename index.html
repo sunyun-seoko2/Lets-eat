@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>밥먹자!</title>
+  <link rel="stylesheet" href="styles.css?v=22" />
+</head>
+<body>
+  <div class="site-top">
+    <header class="app-header">
+      <h1 id="app-title">밥먹자!</h1>
+    </header>
+
+    <div class="tabs-banner-row">
+    <img class="tabs-side-img left" src="assets/tabs-left.png" alt="점심 버튼 왼쪽 이미지" />
+    <nav class="meal-tabs">
+      <button class="meal-tab active" data-tab="lunch" type="button">🥗 점심</button>
+      <button class="meal-tab" data-tab="fridayLunch" type="button">📅 금요일 점심</button>
+      <button class="meal-tab" data-tab="dinner" type="button">🍻 저녁</button>
+      <button class="meal-tab" data-tab="settings" type="button">⚙️ 설정</button>
+      </nav>
+    <img class="tabs-side-img right" src="assets/tabs-right.png" alt="설정 버튼 오른쪽 이미지" />
+    </div>
+  </div>
+  <div id="storage-error-banner" class="storage-error hidden"></div>
+
+  <!-- ============ MEAL PANEL (점심/저녁) ============ -->
+  <main id="panel-meal" class="panel">
+    <section class="card today-groups-card">
+      <div class="card-header">
+        <h2 id="today-group-title">오늘 점심🍽️</h2>
+      </div>
+      <div class="today-groups-wrap">
+        <div class="today-group-col">
+          <h3>외식 파견단 <span id="count-outside" class="muted">총 0명</span></h3>
+          <div class="drop-zone" id="drop-outside" data-group="outside"></div>
+        </div>
+        <div class="today-group-col">
+          <h3>도시락 본부 <span id="count-lunchbox" class="muted">총 0명</span></h3>
+          <div class="drop-zone" id="drop-lunchbox" data-group="lunchbox"></div>
+        </div>
+        <div class="today-group-col">
+          <h3>대상자 <span id="count-pool" class="muted">총 0명</span></h3>
+          <div class="drop-zone pool" id="drop-pool" data-group="pool"></div>
+        </div>
+      </div>
+      <p class="hint">태그를 드래그해서 각 구분으로 옮기세요.</p>
+    </section>
+
+    <section class="card meal-list-card">
+      <div class="card-header">
+        <h2>가게 리스트 <span id="store-count" class="muted">(0)</span></h2>
+        <input id="store-search-main" type="text" class="store-search-input" placeholder="가게 이름 검색" />
+      </div>
+      <ul id="store-list" class="store-list"></ul>
+    </section>
+
+    <section class="card meal-map-card">
+      <div class="card-header map-header">
+        <h2>🗺️ 지도</h2>
+        <button id="btn-map-my-location" class="btn btn-secondary" type="button">📍 내 위치로 이동</button>
+      </div>
+      <div id="map" class="map"></div>
+      <p class="hint" id="map-hint">가게를 클릭하면 지도에서 위치를 확인할 수 있어요.</p>
+    </section>
+
+    <section class="card roulette-card">
+      <h2>🎯 랜덤 룰렛</h2>
+      <p class="hint">랜덤 후보(최대 <strong>5개</strong>) 또는 선택 룰렛(최대 <strong>10개</strong>)으로 돌릴 수 있습니다.</p>
+      <div class="roulette-controls">
+        <button id="btn-pick-roulette" class="btn btn-secondary">🎲 랜덤 5개 뽑기</button>
+        <button id="btn-pick-roulette-selected" class="btn btn-secondary">✅ 선택 룰렛</button>
+        <button id="btn-spin" class="btn btn-primary" disabled>▶ 룰렛 돌리기</button>
+        <button id="btn-reset-roulette" class="btn btn-link" type="button">룰렛 초기화</button>
+      </div>
+      <div class="roulette-stage">
+        <canvas id="roulette-canvas" width="440" height="440"></canvas>
+        <div id="roulette-pointer">▼</div>
+      </div>
+      <div id="roulette-result" class="roulette-result"></div>
+    </section>
+
+    <section class="card vote-card">
+      <div class="card-header vote-card-header">
+        <h2>🗳️ 투표</h2>
+        <button id="btn-vote-history" class="btn btn-secondary vote-history-btn" type="button" title="이전 투표 기록">🕘 이전 투표 기록</button>
+      </div>
+      <p class="hint">무작위 선정(최대 15개) 또는 선택 투표(최대 15개)로 후보를 정한 뒤, 시작/종료 시간을 설정하세요.</p>
+
+      <div class="vote-setup">
+        <div class="form-row two">
+          <label>후보 개수
+            <input type="number" id="vote-candidate-count" min="2" max="15" value="5" />
+          </label>
+          <button type="button" id="btn-pick-vote" class="btn btn-secondary vote-candidate-action">🎲 후보 무작위 선정</button>
+          <button type="button" id="btn-pick-vote-selected" class="btn btn-secondary vote-candidate-action">✅ 후보 선택 투표</button>
+        </div>
+        <div class="form-row two">
+          <label>투표 시작 시간
+            <input type="datetime-local" id="vote-start" />
+          </label>
+          <label>투표 종료 시간
+            <input type="datetime-local" id="vote-end" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button id="btn-create-vote" type="button" class="btn btn-primary" disabled>투표 생성</button>
+        </div>
+        <p class="hint">투표 대상자 선택 목록은 투표 생성 후 표시됩니다.</p>
+      </div>
+
+      <div id="vote-active" class="vote-active hidden">
+        <div class="vote-header">
+          <strong id="vote-status-label"></strong>
+          <span id="vote-timer" class="muted"></span>
+          <button id="btn-cancel-vote" class="btn btn-link">투표 종료/삭제</button>
+        </div>
+        <ul id="vote-candidates" class="vote-candidates"></ul>
+        <div class="form-row">
+          <label>투표 대상자 선택 *
+            <select id="vote-voter-select">
+              <option value="">대상자를 선택하세요</option>
+            </select>
+          </label>
+        </div>
+        <p id="vote-voter-hint" class="hint">남은 투표 가능 대상자를 선택해 투표하세요.</p>
+        <h3>투표 현황</h3>
+        <ul id="vote-results" class="vote-results"></ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ SETTINGS PANEL ============ -->
+  <main id="panel-settings" class="panel hidden">
+    <section class="card settings-tabs-card">
+      <div class="settings-subtabs">
+        <button class="settings-subtab active" type="button" data-settings-tab="people">대상자 추가</button>
+        <button class="settings-subtab" type="button" data-settings-tab="stores">가게 등록</button>
+        <button class="settings-subtab" type="button" data-settings-tab="taste-care">입맛 보호 대상자</button>
+        <button class="settings-subtab" type="button" data-settings-tab="history">기록 관리</button>
+      </div>
+    </section>
+
+    <section class="card settings-subpanel" data-settings-panel="people">
+      <h2>👥 위(胃)대한 명단 관리</h2>
+      <div class="form-row two">
+        <label>대상자 이름
+          <input id="person-name" type="text" placeholder="예: 홍길동" />
+        </label>
+        <label>직책
+          <select id="person-role">
+            <option value="사원 (선임)">사원 (선임)</option>
+            <option value="대리">대리</option>
+            <option value="과장">과장</option>
+            <option value="차장">차장</option>
+            <option value="부장">부장</option>
+            <option value="이사">이사</option>
+            <option value="팀장님">팀장님</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="btn-add-person" type="button" class="btn btn-secondary">추가</button>
+      </div>
+      <ul id="person-list" class="store-list"></ul>
+    </section>
+
+    <section class="card settings-subpanel hidden taste-care-panel" data-settings-panel="taste-care">
+      <h2>💚 입맛 보호 대상자 관리</h2>
+      <div class="form-row two taste-care-form-row">
+        <label>대상자 선택
+          <select id="caution-person">
+            <option value="">대상자를 선택하세요</option>
+          </select>
+        </label>
+        <label>주의 내용 태그
+          <input id="caution-note" type="text" placeholder="예: 갑각류 알러지 / 회 섭취 불가" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="btn-add-caution" type="button" class="btn btn-secondary">주의 태그 추가</button>
+        <button id="btn-caution-store-blocks" type="button" class="btn btn-secondary">못가는 가게 선택</button>
+      </div>
+      <p id="caution-store-block-summary" class="hint">선택된 못가는 가게가 없습니다.</p>
+      <ul id="caution-list" class="store-list"></ul>
+    </section>
+
+    <section class="card settings-subpanel hidden" data-settings-panel="history">
+      <div class="card-header">
+        <h2>🗂️ 랜덤/후보 기록 관리</h2>
+        <button id="btn-random-history-clear-all" type="button" class="btn btn-link">전체 삭제</button>
+      </div>
+      <p class="hint">월~금 주간 기록이며, 매주 토요일 10:00(서울)에 전체 초기화됩니다. 수동 삭제 시 비밀번호가 필요합니다.</p>
+      <div class="form-row">
+        <label>조회할 식사 탭
+          <select id="random-history-meal">
+            <option value="all">전체</option>
+            <option value="lunch">점심</option>
+            <option value="fridayLunch">금요일 점심</option>
+            <option value="dinner">저녁</option>
+          </select>
+        </label>
+      </div>
+      <ul id="random-history-list" class="store-list"></ul>
+    </section>
+
+    <section class="card settings-subpanel hidden" data-settings-panel="stores">
+      <h2>🪄 URL로 빠른 등록</h2>
+      <div class="form-row">
+        <label>가게 이름 검색
+          <input id="store-search-settings-top" type="text" placeholder="등록 여부를 확인할 가게 이름" />
+        </label>
+      </div>
+      <p class="hint">
+        네이버 지도에서 가게 페이지의 URL을 복사해 붙여넣으면 가게 이름과 좌표를 자동으로 추출합니다.
+        <br/>예: <code>https://map.naver.com/p/search/김밥천국/place/1194911319?c=...</code>
+      </p>
+
+      <div class="form-row">
+        <label>등록할 식사
+          <div class="radio-group" id="reg-meal-group">
+            <label><input type="radio" name="reg-meal" value="lunch" checked /> 🥗 점심</label>
+            <label><input type="radio" name="reg-meal" value="dinner" /> 🍻 저녁</label>
+            <label><input type="radio" name="reg-meal" value="fridayLunch" /> 📅 금요일 점심</label>
+          </div>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>네이버 지도 URL *
+          <input id="reg-url" type="url" placeholder="https://map.naver.com/p/search/.../place/..." />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>메모 (선택)
+          <input id="reg-memo" type="text" placeholder="예: 점심특선 9,000원 · 매운 음식 추천 등" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="btn-auto-add" class="btn btn-primary">URL로 자동 등록</button>
+      </div>
+      <div id="auto-add-status" class="auto-status"></div>
+
+      <details class="manual-form">
+        <summary>수동으로 직접 입력하기</summary>
+        <form id="store-form" class="store-form">
+          <div class="form-row">
+            <label>가게 이름 *
+              <input type="text" id="store-name" required placeholder="예: 김밥천국 강남점" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>네이버 지도 URL
+              <input type="url" id="store-url" placeholder="https://map.naver.com/... (선택)" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>주소 (지도 표시용)
+              <input type="text" id="store-address" placeholder="예: 서울시 강남구 테헤란로 123" />
+            </label>
+            <button type="button" id="btn-geocode" class="btn btn-secondary">📍 좌표 찾기</button>
+          </div>
+          <div class="form-row two">
+            <label>위도(lat)
+              <input type="number" step="any" id="store-lat" placeholder="자동 채워짐" />
+            </label>
+            <label>경도(lng)
+              <input type="number" step="any" id="store-lng" placeholder="자동 채워짐" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>메모
+              <input type="text" id="store-memo" placeholder="예: 점심특선 9,000원" />
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">+ 등록</button>
+          </div>
+        </form>
+      </details>
+    </section>
+
+    <section class="card settings-subpanel hidden" data-settings-panel="stores">
+      <div class="card-header">
+        <h2>등록된 가게 <span id="settings-store-count" class="muted">(0)</span></h2>
+        <input id="store-search-settings-list" type="text" class="store-search-input" placeholder="가게 이름 검색" />
+      </div>
+      <p class="hint">선택한 식사 탭의 등록된 가게입니다. 좌표가 없는 가게는 “📍 지도에서 지정” 버튼으로 위치를 잡아주세요.</p>
+      <ul id="settings-store-list" class="store-list"></ul>
+
+      <div id="settings-map-wrap" class="hidden">
+        <h3>📍 지도에서 좌표 지정</h3>
+        <p class="hint" id="pick-mode-hint">지도 위에서 정확한 위치를 클릭해주세요. ESC로 취소.</p>
+        <div id="settings-map" class="map"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer"></footer>
+
+
+  <!-- Naver Maps JavaScript API. Client ID is safe to expose in browser code. -->
+  <!-- 만약 인증 오류가 발생하면 ncpKeyId → ncpClientId 로 바꿔보세요. -->
+  <script type="text/javascript"
+    src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=ufhtl7ialy&submodules=geocoder">
+  </script>
+
+  <script src="js/config.js?v=11"></script>
+  <script src="js/storage.js?v=11"></script>
+  <script src="js/storage-azure.js?v=11"></script>
+  <script src="js/stores.js?v=9"></script>
+  <script src="js/maps.js?v=11"></script>
+  <script src="js/naver-api.js?v=9"></script>
+  <script src="js/week-history.js?v=1"></script>
+  <script src="js/roulette.js?v=11"></script>
+  <script src="js/voting.js?v=10"></script>
+  <script src="js/app.js?v=23"></script>
+</body>
+</html>
