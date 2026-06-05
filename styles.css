@@ -1565,6 +1565,12 @@ main {
     margin-left: 0;
   }
 
+  #panel-meal .today-groups-card { order: 1; }
+  #panel-meal .meal-list-card { order: 2; }
+  #panel-meal .roulette-card { order: 3; }
+  #panel-meal .meal-map-card { order: 4; }
+  #panel-meal .vote-card { order: 5; }
+
   .card {
     background: #1b1b1f;
     border-color: #45464f;
