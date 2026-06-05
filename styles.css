@@ -78,7 +78,7 @@ body {
 .tabs-side-img {
   width: 100%;
   height: auto;
-  max-height: 150px;
+  max-height: 200px;
   object-fit: contain;
   border-radius: 10px;
 }
