@@ -54,7 +54,7 @@ body {
   font-size: 40px;
   line-height: 1.1;
   cursor: pointer;
-  transform: translateY(44px);
+  transform: translateY(22px);
 }
 
 .meal-tabs {
@@ -77,7 +77,7 @@ body {
 
 .tabs-side-img {
   width: 400px;
-  height: 200px;
+  height: 100px;
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -85,11 +85,11 @@ body {
 }
 
 .tabs-side-img.left {
-  transform: translate(-150px, -24px);
+  transform: translate(-150px, -12px);
 }
 
 .tabs-side-img.right {
-  transform: translate(150px, -24px);
+  transform: translate(150px, -12px);
 }
 
 .meal-tab {
@@ -638,7 +638,7 @@ main {
 
 .roulette-stage {
   position: relative;
-  width: min(440px, 100%);
+  width: min(300px, 100%);
   max-width: 100%;
   margin: 0 auto;
 }
@@ -1004,7 +1004,7 @@ main {
   display: grid;
   gap: 16px;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: 0 16px 60px;
   grid-template-columns: repeat(3, 1fr);
@@ -1050,7 +1050,7 @@ main {
   border: 1px solid #cfd6e6;
   border-radius: 10px;
   overflow: hidden;
-  min-height: 520px;
+  min-height: 350px;
 }
 
 .today-group-col h3 {
