@@ -62,34 +62,38 @@ body {
   justify-content: center;
   gap: 8px;
   padding: 0;
+  flex-wrap: wrap;
 }
 
 .tabs-banner-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 2px 10px 16px;
+  gap: 16px;
+  padding: 8px 16px 16px;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1680px;
+  margin: 0 auto;
   flex-shrink: 0;
 }
 
 .tabs-side-img {
-  width: 400px;
-  height: 100px;
-  object-fit: cover;
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
   border-radius: 10px;
   border: 1px solid var(--border);
-  flex-shrink: 0;
 }
 
 .tabs-side-img.left {
-  transform: translate(-150px, -12px);
+  transform: none;
+  justify-self: start;
 }
 
 .tabs-side-img.right {
-  transform: translate(150px, -12px);
+  transform: none;
+  justify-self: end;
 }
 
 .meal-tab {
