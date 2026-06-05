@@ -21,8 +21,8 @@
 window.AppConfig = {
   storage: 'azure',
   azure: {
-    account: 'agenthta1de',
-    sas: 'sv=2025-11-05&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2028-05-01T13:42:29Z&st=2026-05-13T05:27:29Z&spr=https&sig=%2FbGPHhAkPfZl406cd1ntjVoAY8GHxzwCQD%2F8uL9kPhM%3D',
+    account: 'letseatstorage2026',
+    sas: 'sv=2026-02-06&ss=t&srt=sco&sp=rwdlacu&se=2029-12-31T15:00:00Z&st=2026-06-05T07:10:29Z&spr=https&sig=JKknPUFbViHVRjuAoW5YIEij8zE%2BBJZZELyRnITHuLs%3D',
     tableStores: 'stores',
     tableVotes: 'votes',
     tablePeople: 'people',
