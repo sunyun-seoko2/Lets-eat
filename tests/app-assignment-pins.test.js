@@ -58,8 +58,8 @@ test('person tags include a pin icon and pin management menu', () => {
   assert.match(stylesSource, /\.person-tag\.is-pinned/);
 });
 
-test('desktop assignment columns give person names more room by reducing map width', () => {
-  assert.match(stylesSource, /#panel-meal\s*{[\s\S]*grid-template-columns:\s*minmax\(500px,\s*560px\)\s+minmax\(0,\s*0\.85fr\)\s+minmax\(0,\s*0\.65fr\);/);
+test('desktop assignment columns use 3-column equal layout', () => {
+  assert.match(stylesSource, /#panel-meal\s*{[\s\S]*grid-template-columns:\s*repeat\(3,\s*1fr\);/);
   assert.match(stylesSource, /\.person-tag\s*{[\s\S]*width:\s*min\(168px,\s*calc\(100%\s*-\s*4px\)\);/);
   assert.match(stylesSource, /\.person-tag-label\s*{[\s\S]*text-align:\s*center;/);
 });
