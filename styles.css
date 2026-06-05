@@ -76,11 +76,12 @@ body {
 }
 
 .tabs-side-img {
-  width: 100%;
+  width: auto;
   height: auto;
-  max-height: 250px;
+  max-height: 220px;
   object-fit: contain;
-  border-radius: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
 }
 
 .tabs-side-img.left {

@@ -17,7 +17,7 @@ test('mobile assignment tags open a touch-only move menu', () => {
 });
 
 test('phone layout stacks title images and tabs without changing desktop defaults', () => {
-  assert.match(stylesSource, /\.tabs-side-img\s*{\s*width:\s*100%;\s*height:\s*auto;\s*max-height:\s*250px;/);
+  assert.match(stylesSource, /\.tabs-side-img\s*{\s*width:\s*auto;\s*height:\s*auto;\s*max-height:\s*220px;\s*object-fit:\s*contain;\s*border-radius:\s*14px;\s*border:\s*1px\s+solid\s+var\(--border\);/);
   assert.match(stylesSource, /@media\s*\(max-width:\s*560px\)\s*{[\s\S]*body\s*{[\s\S]*background:\s*#101116;/);
   assert.match(stylesSource, /@media\s*\(max-width:\s*560px\)\s*{[\s\S]*\.app-header h1\s*{[\s\S]*transform:\s*none;/);
   assert.match(stylesSource, /@media\s*\(max-width:\s*560px\)\s*{[\s\S]*\.tabs-banner-row\s*{[\s\S]*grid-template-areas:\s*"left"\s*"right"\s*"tabs";/);
