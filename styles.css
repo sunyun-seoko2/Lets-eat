@@ -702,7 +702,7 @@ main {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 16px 60px;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
 }
 #panel-meal .today-groups-card { grid-column: 1; grid-row: 1; }
