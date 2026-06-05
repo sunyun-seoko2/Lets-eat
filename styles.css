@@ -1001,11 +1001,13 @@ main {
 }
 
 #panel-meal {
+  display: grid;
+  gap: 16px;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 16px 60px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   align-items: stretch;
 }
 
