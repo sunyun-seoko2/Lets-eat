@@ -1955,20 +1955,20 @@ main {
     margin-left: 0;
   }
 
-  #panel-meal .meal-map-card {
+  #panel-meal .meal-list-card {
     grid-column: 2;
     grid-row: 1;
-    margin-left: 0;
   }
 
-  #panel-meal .meal-list-card {
+  #panel-meal .roulette-card {
     grid-column: 1;
     grid-row: 2;
   }
 
-  #panel-meal .roulette-card {
+  #panel-meal .meal-map-card {
     grid-column: 2;
     grid-row: 2;
+    margin-left: 0;
   }
 
   #panel-meal .vote-card {
