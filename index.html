@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,12 +8,13 @@
   <link rel="stylesheet" href="styles.css?v=23" />
   <script>
     // Apply saved theme immediately to prevent flash of light theme
-    (function() {
+    (function () {
       var saved = localStorage.getItem('ls.theme.v1');
       if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     })();
   </script>
 </head>
+
 <body>
   <div class="site-top">
     <header class="app-header">
@@ -20,30 +22,32 @@
     </header>
 
     <div class="tabs-banner-row">
-    <img class="tabs-side-img left" src="assets/tabs-left.png" alt="점심 버튼 왼쪽 이미지" />
-    <nav class="meal-tabs">
-      <button class="meal-tab active" data-tab="lunch" type="button">🥗 점심</button>
-      <button class="meal-tab" data-tab="fridayLunch" type="button">📅 금요일 점심</button>
-      <button class="meal-tab" data-tab="dinner" type="button">🍻 저녁</button>
-      <button class="meal-tab" data-tab="settings" type="button">⚙️ 설정</button>
-      <button id="theme-toggle" class="theme-toggle" type="button" title="다크모드 전환" aria-label="다크모드 전환">
-        <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-        <svg class="theme-icon moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-      </button>
+      <img class="tabs-side-img left" src="assets/tabs-left.png" alt="점심 버튼 왼쪽 이미지" />
+      <nav class="meal-tabs">
+        <button class="meal-tab active" data-tab="lunch" type="button">🥗 점심</button>
+        <button class="meal-tab" data-tab="fridayLunch" type="button">금요일 점심</button>
+        <button class="meal-tab" data-tab="dinner" type="button">🍻 저녁</button>
+        <button class="meal-tab" data-tab="settings" type="button">⚙️ 설정</button>
+        <button id="theme-toggle" class="theme-toggle" type="button" title="다크모드 전환" aria-label="다크모드 전환">
+          <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg class="theme-icon moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
       </nav>
-    <img class="tabs-side-img right" src="assets/tabs-right.png" alt="설정 버튼 오른쪽 이미지" />
+      <img class="tabs-side-img right" src="assets/tabs-right.png" alt="설정 버튼 오른쪽 이미지" />
     </div>
   </div>
   <div id="storage-error-banner" class="storage-error hidden"></div>
@@ -107,7 +111,8 @@
     <section class="card vote-card">
       <div class="card-header vote-card-header">
         <h2>🗳️ 투표</h2>
-        <button id="btn-vote-history" class="btn btn-secondary vote-history-btn" type="button" title="이전 투표 기록">🕘 이전 투표 기록</button>
+        <button id="btn-vote-history" class="btn btn-secondary vote-history-btn" type="button" title="이전 투표 기록">🕘 이전 투표
+          기록</button>
       </div>
       <p class="hint">무작위 선정(최대 15개) 또는 선택 투표(최대 15개)로 후보를 정한 뒤, 시작/종료 시간을 설정하세요.</p>
 
@@ -117,7 +122,8 @@
             <input type="number" id="vote-candidate-count" min="2" max="15" value="5" />
           </label>
           <button type="button" id="btn-pick-vote" class="btn btn-secondary vote-candidate-action">🎲 후보 무작위 선정</button>
-          <button type="button" id="btn-pick-vote-selected" class="btn btn-secondary vote-candidate-action">✅ 후보 선택 투표</button>
+          <button type="button" id="btn-pick-vote-selected" class="btn btn-secondary vote-candidate-action">✅ 후보 선택
+            투표</button>
         </div>
         <div class="form-row two">
           <label>투표 시작 시간
@@ -237,7 +243,7 @@
       </div>
       <p class="hint">
         네이버 지도에서 가게 페이지의 URL을 복사해 붙여넣으면 가게 이름과 좌표를 자동으로 추출합니다.
-        <br/>예: <code>https://map.naver.com/p/search/김밥천국/place/1194911319?c=...</code>
+        <br />예: <code>https://map.naver.com/p/search/김밥천국/place/1194911319?c=...</code>
       </p>
 
       <div class="form-row">
@@ -326,7 +332,7 @@
   <!-- 만약 인증 오류가 발생하면 ncpKeyId → ncpClientId 로 바꿔보세요. -->
   <script type="text/javascript"
     src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=hxjr338ho7&submodules=geocoder">
-  </script>
+    </script>
 
   <script src="js/config.js?v=11"></script>
   <script src="js/storage.js?v=11"></script>
@@ -339,4 +345,5 @@
   <script src="js/voting.js?v=10"></script>
   <script src="js/app.js?v=23"></script>
 </body>
+
 </html>
