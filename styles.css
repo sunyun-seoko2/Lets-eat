@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #f6f7fb;
   --card: #ffffff;
   --text: #1f2330;
@@ -1636,8 +1636,6 @@ main {
 
 @media (max-width: 560px) {
   body {
-    background: #101116;
-    color: #f1f2ff;
   }
 
   .site-top {
@@ -1656,7 +1654,6 @@ main {
     z-index: 1;
     font-size: 32px;
     transform: none;
-    color: #f4f5ff;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   }
 
@@ -1675,7 +1672,6 @@ main {
     max-height: none;
     object-fit: cover;
     transform: none !important;
-    border-color: #4a4b55;
     filter: brightness(0.62);
   }
 
@@ -1704,8 +1700,6 @@ main {
     justify-self: center;
     width: 40px;
     height: 40px;
-    background: #2a2b34;
-    border-color: #4c4d57;
   }
 
   .meal-tab {
@@ -1713,9 +1707,6 @@ main {
     min-height: 56px;
     padding: 7px 6px;
     border-radius: 999px;
-    background: #4a4a4d;
-    border-color: #4c4d57;
-    color: #edeef8;
     font-size: 15px;
     line-height: 1.25;
     white-space: normal;
@@ -1728,8 +1719,6 @@ main {
   }
 
   .meal-tab.active {
-    background: #2634ce;
-    border-color: #2634ce;
     box-shadow: 0 7px 18px rgba(38, 52, 206, 0.42);
   }
 
@@ -1756,25 +1745,20 @@ main {
   #panel-meal .vote-card { order: 5; }
 
   .card {
-    background: #1b1b1f;
-    border-color: #45464f;
     border-radius: 12px;
     padding: 16px 14px 18px;
     box-shadow: none;
   }
 
   .card h2 {
-    color: #f2f3ff;
     font-size: 22px;
     line-height: 1.25;
   }
 
   .muted {
-    color: #aaacba;
   }
 
   .hint {
-    color: #b4b5c2;
     font-size: 13px;
   }
 
@@ -1786,8 +1770,6 @@ main {
     grid-template-columns: 1fr;
     gap: 0;
     min-height: 0;
-    border-color: #45464f;
-    background: #18191e;
   }
 
   .today-group-col {
@@ -1800,8 +1782,6 @@ main {
   }
 
   .today-group-col h3 {
-    background: #18191e;
-    color: #f0f1ff;
     font-size: 17px;
     padding: 12px 10px 10px;
   }
@@ -1811,12 +1791,9 @@ main {
     height: auto;
     gap: 6px;
     padding: 10px 8px;
-    background: #17171a;
-    border-top-color: #3f414b;
   }
 
   .drop-zone.drag-over {
-    background: #22273f;
   }
 
   .person-tag {
@@ -1824,24 +1801,17 @@ main {
     min-width: 0;
     height: 34px;
     padding: 0 28px 0 8px;
-    background: #161820;
-    border-color: #4b5274;
-    color: #f5f6ff;
     font-size: 14px;
     cursor: pointer;
   }
 
   .person-tag:active {
-    background: #252d72;
   }
 
   .person-tag.is-pinned {
-    border-color: #7580ef;
-    background: #1b2140;
   }
 
   .person-pin-btn {
-    color: #f29abb;
     opacity: 0.9;
   }
 
@@ -1858,27 +1828,19 @@ main {
   }
 
   .store-list li {
-    background: #17181d;
-    border-color: #3f414d;
-    color: #f1f2ff;
   }
 
   .store-list li:hover {
-    background: #20222b;
   }
 
   .store-list li.selected {
-    background: #252d72;
-    border-color: #6671ff;
   }
 
   .store-list .s-meta {
-    color: #b4b5c2;
   }
 
   .meal-map-card .map {
     height: 360px;
-    border-color: #4a4b55;
   }
 
   .map-header {
@@ -1926,7 +1888,6 @@ main {
   }
 
   .roulette-result {
-    color: #f2f3ff;
   }
 
   .vote-setup .form-row {
@@ -1952,9 +1913,6 @@ main {
   .settings-subpanel .form-row select,
   .store-form input,
   .store-form textarea {
-    background: #2a2a2d;
-    border-color: #4a4b55;
-    color: #f2f3ff;
   }
 
   .btn {
@@ -1963,55 +1921,34 @@ main {
   }
 
   .btn-secondary {
-    background: #4b4d60;
-    color: #dce0ff;
   }
 
   .btn-primary {
-    background: #2634ce;
   }
 
   .vote-candidate-action {
-    background: #402000;
-    border-color: #9a560e;
-    color: #ffe7bd;
     box-shadow: 0 8px 22px rgba(154, 86, 14, 0.2);
   }
 
   .visibility-modal-backdrop {
-    background: rgba(0, 0, 0, 0.58);
   }
 
   .visibility-modal {
-    background: #1d1d22;
-    border-color: #4c4d57;
-    color: #f2f3ff;
   }
 
   .visibility-modal .actions button {
-    background: #30313a;
-    border-color: #575967;
-    color: #f2f3ff;
   }
 
   .assignment-move-modal {
-    background: #1d1d22;
   }
 
   .assignment-pin-help {
-    background: #181b2a;
-    border-color: #4c4d67;
-    color: #d6d8ea;
   }
 
   .assignment-pin-help strong {
-    color: #aeb6ff;
   }
 
   .assignment-move-actions button {
-    background: #252a5f;
-    border-color: #6068dd;
-    color: #f2f3ff;
   }
 
   #btn-map-my-location {
@@ -2024,9 +1961,6 @@ main {
     width: 100%;
     max-width: none;
     margin-top: 8px;
-    background: #2a2a2d;
-    border-color: #4a4b55;
-    color: #f2f3ff;
   }
 
   .store-block-search-row .store-search-input {
@@ -2036,8 +1970,6 @@ main {
 
 @media (min-width: 561px) and (max-width: 1024px) {
   body {
-    background: #101116;
-    color: #f1f2ff;
   }
 
   .site-top {
@@ -2056,7 +1988,6 @@ main {
     z-index: 1;
     font-size: 38px;
     transform: none;
-    color: #f4f5ff;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   }
 
@@ -2080,7 +2011,6 @@ main {
     max-height: none;
     object-fit: cover;
     transform: none !important;
-    border-color: #4a4b55;
     filter: brightness(0.62);
   }
 
@@ -2106,8 +2036,6 @@ main {
     justify-self: center;
     width: 42px;
     height: 42px;
-    background: #2a2b34;
-    border-color: #4c4d57;
   }
 
   .meal-tab {
@@ -2115,9 +2043,6 @@ main {
     min-height: 70px;
     padding: 8px 8px;
     border-radius: 999px;
-    background: #4a4a4d;
-    border-color: #4c4d57;
-    color: #edeef8;
     font-size: 18px;
     line-height: 1.22;
     white-space: normal;
@@ -2130,8 +2055,6 @@ main {
   }
 
   .meal-tab.active {
-    background: #2634ce;
-    border-color: #2634ce;
     box-shadow: 0 7px 18px rgba(38, 52, 206, 0.42);
   }
 
@@ -2170,25 +2093,20 @@ main {
   }
 
   .card {
-    background: #1b1b1f;
-    border-color: #45464f;
     border-radius: 12px;
     padding: 16px 16px 18px;
     box-shadow: none;
   }
 
   .card h2 {
-    color: #f2f3ff;
     font-size: 20px;
     line-height: 1.25;
   }
 
   .muted {
-    color: #aaacba;
   }
 
   .hint {
-    color: #b4b5c2;
     font-size: 13px;
   }
 
@@ -2215,8 +2133,6 @@ main {
   .today-groups-wrap {
     grid-template-columns: 1fr;
     min-height: 0;
-    border-color: #45464f;
-    background: #18191e;
   }
 
   .today-group-col {
@@ -2229,8 +2145,6 @@ main {
   }
 
   .today-group-col h3 {
-    background: #18191e;
-    color: #f0f1ff;
     font-size: 16px;
   }
 
@@ -2239,8 +2153,6 @@ main {
     height: auto;
     gap: 6px;
     padding: 10px 8px;
-    background: #17171a;
-    border-top-color: #3f414b;
   }
 
   .person-tag {
@@ -2248,29 +2160,21 @@ main {
     min-width: 0;
     height: 32px;
     padding: 0 28px 0 8px;
-    background: #161820;
-    border-color: #4b5274;
-    color: #f5f6ff;
     cursor: pointer;
   }
 
   .person-tag:active {
-    background: #252d72;
   }
 
   .person-tag.is-pinned {
-    border-color: #7580ef;
-    background: #1b2140;
   }
 
   .person-pin-btn {
-    color: #f29abb;
     opacity: 0.9;
   }
 
   .meal-map-card .map {
     height: 500px;
-    border-color: #4a4b55;
   }
 
   .meal-list-card #store-list {
@@ -2278,22 +2182,15 @@ main {
   }
 
   .store-list li {
-    background: #17181d;
-    border-color: #3f414d;
-    color: #f1f2ff;
   }
 
   .store-list li:hover {
-    background: #20222b;
   }
 
   .store-list li.selected {
-    background: #252d72;
-    border-color: #6671ff;
   }
 
   .store-list .s-meta {
-    color: #b4b5c2;
   }
 
   .btn {
@@ -2302,12 +2199,9 @@ main {
   }
 
   .btn-secondary {
-    background: #4b4d60;
-    color: #dce0ff;
   }
 
   .btn-primary {
-    background: #2634ce;
   }
 
   .roulette-controls {
@@ -2330,7 +2224,6 @@ main {
   }
 
   .roulette-result {
-    color: #f2f3ff;
   }
 
   .vote-setup input,
@@ -2341,44 +2234,26 @@ main {
   .store-form input,
   .store-form textarea,
   .store-search-input {
-    background: #2a2a2d;
-    border-color: #4a4b55;
-    color: #f2f3ff;
   }
 
   .visibility-modal-backdrop {
-    background: rgba(0, 0, 0, 0.58);
   }
 
   .visibility-modal {
-    background: #1d1d22;
-    border-color: #4c4d57;
-    color: #f2f3ff;
   }
 
   .visibility-modal .actions button {
-    background: #30313a;
-    border-color: #575967;
-    color: #f2f3ff;
   }
 
   .assignment-move-modal {
-    background: #1d1d22;
   }
 
   .assignment-pin-help {
-    background: #181b2a;
-    border-color: #4c4d67;
-    color: #d6d8ea;
   }
 
   .assignment-pin-help strong {
-    color: #aeb6ff;
   }
 
   .assignment-move-actions button {
-    background: #252a5f;
-    border-color: #6068dd;
-    color: #f2f3ff;
   }
 }
