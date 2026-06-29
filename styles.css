@@ -259,6 +259,21 @@ body {
   box-shadow: 0 6px 16px rgba(91, 108, 255, .25);
 }
 
+.meal-tab:not(.active):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-color: var(--primary);
+}
+
+.meal-tab:active {
+  transform: translateY(0) scale(0.95);
+}
+
+[data-theme="dark"] .meal-tab:not(.active):hover {
+  box-shadow: 0 4px 24px rgba(123, 138, 255, 0.35);
+  border-color: #7b8aff;
+}
+
 main {
   max-width: 820px;
   margin: 0 auto;
