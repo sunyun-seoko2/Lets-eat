@@ -10,6 +10,148 @@
   --danger: #e44a4a;
   --success: #2bb673;
   --warn: #f5b400;
+
+  /* Extended dark mode tokens */
+  --card-hover: #f1f3ff;
+  --card-item: #fafbff;
+  --input-bg: #fff;
+  --input-border: var(--border);
+  --drop-zone-bg: #fff;
+  --drop-zone-header: #f9fafe;
+  --drop-zone-border: #e3e8f2;
+  --drop-zone-wrap-border: #cfd6e6;
+  --person-tag-bg: #f4f7ff;
+  --person-tag-border: #dbe2ff;
+  --person-tag-color: #1f2330;
+  --modal-bg: #fff;
+  --modal-border: var(--border);
+  --modal-btn-bg: #fff;
+  --modal-btn-border: var(--border);
+  --btn-secondary-bg: #eef0ff;
+  --btn-secondary-color: #4453d9;
+  --tabs-img-brightness: 1;
+  --vote-header-bg: #fff8dd;
+  --vote-bar-bg: var(--secondary);
+  --vote-role-bg: #eef2ff;
+  --vote-role-color: #5560c9;
+  --storage-warn-bg: #fff3cd;
+  --storage-warn-border: #ffe69c;
+  --storage-warn-color: #6b5400;
+  --footer-code-bg: #eef0ff;
+  --roulette-empty-bg: #eef0ff;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --card: #1a1b22;
+  --text: #e8e9f5;
+  --muted: #9da0b4;
+  --primary: #7b8aff;
+  --primary-dark: #9ba6ff;
+  --secondary: #252840;
+  --border: #2e3044;
+  --danger: #ff6b6b;
+  --success: #34d889;
+  --warn: #ffc240;
+
+  --card-hover: #22243a;
+  --card-item: #1e1f2a;
+  --input-bg: #23242e;
+  --input-border: #3a3c52;
+  --drop-zone-bg: #16171e;
+  --drop-zone-header: #1c1d26;
+  --drop-zone-border: #2e3044;
+  --drop-zone-wrap-border: #3a3c52;
+  --person-tag-bg: #1e2035;
+  --person-tag-border: #3d4170;
+  --person-tag-color: #e4e5f5;
+  --modal-bg: #1a1b24;
+  --modal-border: #3a3c52;
+  --modal-btn-bg: #25263a;
+  --modal-btn-border: #4a4c60;
+  --btn-secondary-bg: #252840;
+  --btn-secondary-color: #a0aaff;
+  --tabs-img-brightness: 0.62;
+  --vote-header-bg: #2a2418;
+  --vote-bar-bg: #252840;
+  --vote-role-bg: #1e2240;
+  --vote-role-color: #a0aaff;
+  --storage-warn-bg: #2a2418;
+  --storage-warn-border: #504020;
+  --storage-warn-color: #ddc070;
+  --footer-code-bg: #252840;
+  --roulette-empty-bg: #252840;
+}
+
+/* ---- Theme Toggle Button ---- */
+.theme-toggle {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.theme-toggle:hover {
+  transform: scale(1.12);
+  box-shadow: 0 4px 18px rgba(91, 108, 255, 0.2);
+  border-color: var(--primary);
+}
+
+.theme-toggle:active {
+  transform: scale(0.95);
+}
+
+.theme-icon {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Light mode: show sun, hide moon */
+.sun-icon {
+  color: #f5a623;
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.moon-icon {
+  color: #7b8aff;
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+
+/* Dark mode: show moon, hide sun */
+[data-theme="dark"] .sun-icon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+
+[data-theme="dark"] .moon-icon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  color: #ffd36f;
+}
+
+[data-theme="dark"] .theme-toggle {
+  border-color: #3d4170;
+  background: #252840;
+  box-shadow: 0 2px 12px rgba(123, 138, 255, 0.15);
+}
+
+[data-theme="dark"] .theme-toggle:hover {
+  box-shadow: 0 4px 24px rgba(123, 138, 255, 0.35);
+  border-color: #7b8aff;
 }
 
 * {
@@ -32,6 +174,7 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
+  transition: background-color 0.4s ease, color 0.3s ease;
 }
 
 .site-top {
@@ -130,6 +273,7 @@ main {
   border-radius: 14px;
   padding: 18px 18px 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, .03);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .card h2 {
@@ -159,10 +303,11 @@ main {
   width: 200px;
   max-width: 38%;
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 13px;
-  background: #fff;
+  background: var(--input-bg);
+  color: var(--text);
   text-align: center;
 }
 
@@ -209,19 +354,19 @@ main {
 
 .store-form input {
   padding: 9px 11px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 14px;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--text);
 }
 
 .store-form textarea {
   padding: 9px 11px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 14px;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--text);
   resize: vertical;
   min-height: 78px;
@@ -286,12 +431,12 @@ main {
 }
 
 .btn-secondary {
-  background: var(--secondary);
-  color: var(--primary-dark);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-color);
 }
 
 .btn-secondary:hover {
-  background: #e0e4ff;
+  background: var(--card-hover);
 }
 
 .vote-candidate-action {
@@ -331,17 +476,17 @@ main {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fafbff;
+  background: var(--card-item);
   cursor: pointer;
 }
 
 .store-list li:hover {
-  background: #f1f3ff;
+  background: var(--card-hover);
 }
 
 .store-list li.selected {
   border-color: var(--primary);
-  background: #eef0ff;
+  background: var(--secondary);
 }
 
 .store-list .s-name {
@@ -377,13 +522,18 @@ main {
   z-index: 9999;
 }
 
+[data-theme="dark"] .visibility-modal-backdrop {
+  background: rgba(0, 0, 0, 0.58);
+}
+
 .visibility-modal {
   width: min(360px, calc(100% - 24px));
-  background: #fff;
+  background: var(--modal-bg);
   border-radius: 12px;
   padding: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--modal-border);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+  color: var(--text);
 }
 
 .visibility-modal h3 {
@@ -416,8 +566,9 @@ main {
 }
 
 .visibility-modal .actions button {
-  border: 1px solid var(--border);
-  background: #fff;
+  border: 1px solid var(--modal-btn-border);
+  background: var(--modal-btn-bg);
+  color: var(--text);
   border-radius: 8px;
   padding: 7px 12px;
   cursor: pointer;
@@ -443,8 +594,8 @@ main {
 
 .assignment-move-actions button {
   border: 1px solid var(--border);
-  background: #f4f7ff;
-  color: var(--primary-dark);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-color);
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 15px;
@@ -559,7 +710,8 @@ main {
 
 .store-list .s-actions button {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card);
+  color: var(--text);
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 12px;
@@ -711,17 +863,20 @@ main {
 
 .vote-setup input {
   padding: 9px 11px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 14px;
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .vote-active select {
   padding: 9px 11px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 14px;
-  background: #fff;
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .vote-card-header h2 {
@@ -762,7 +917,8 @@ main {
 
 .store-block-bulk-btn {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card);
+  color: var(--text);
   border-radius: 8px;
   padding: 7px 10px;
   font-size: 12px;
@@ -770,12 +926,13 @@ main {
 }
 
 .store-block-bulk-btn:hover {
-  background: #f5f7ff;
+  background: var(--card-hover);
 }
 
 .store-block-tab {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card);
+  color: var(--text);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 13px;
@@ -791,7 +948,7 @@ main {
 .store-block-list {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--card);
   padding: 8px 10px;
   min-height: 0;
   flex: 1;
@@ -884,7 +1041,7 @@ main {
 .vote-history-list li {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fafbff;
+  background: var(--card-item);
   padding: 8px 10px;
   font-size: 12px;
 }
@@ -912,7 +1069,7 @@ main {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  background: #fff8dd;
+  background: var(--vote-header-bg);
   border-radius: 10px;
   margin-bottom: 10px;
   flex-wrap: wrap;
@@ -959,7 +1116,7 @@ main {
   grid-template-columns: 1fr auto;
   gap: 6px;
   padding: 6px 12px;
-  background: #fafbff;
+  background: var(--card-item);
   border-radius: 6px;
 }
 
@@ -989,8 +1146,8 @@ main {
   max-width: 100%;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #5560c9;
+  background: var(--vote-role-bg);
+  color: var(--vote-role-color);
   font-weight: 700;
 }
 
@@ -1053,7 +1210,7 @@ main {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  border: 1px solid #cfd6e6;
+  border: 1px solid var(--drop-zone-wrap-border);
   border-radius: 10px;
   overflow: hidden;
   min-height: 350px;
@@ -1064,13 +1221,13 @@ main {
   font-size: 12px;
   padding: 10px 12px 8px;
   font-weight: 700;
-  background: #f9fafe;
+  background: var(--drop-zone-header);
   white-space: nowrap;
   text-align: center;
 }
 
 .today-group-col {
-  border-left: 1px solid #d8dfed;
+  border-left: 1px solid var(--drop-zone-border);
 }
 
 .today-group-col:first-child {
@@ -1081,18 +1238,18 @@ main {
   min-height: 0;
   height: calc(100% - 37px);
   border: none;
-  border-top: 1px solid #e3e8f2;
+  border-top: 1px solid var(--drop-zone-border);
   border-radius: 0;
   padding: 6px 6px;
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
   align-content: flex-start;
-  background: #fff;
+  background: var(--drop-zone-bg);
 }
 
 .drop-zone.drag-over {
-  background: #eef2ff;
+  background: var(--secondary);
 }
 
 .person-tag {
@@ -1104,9 +1261,9 @@ main {
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
-  color: #1f2330;
-  border: 1px solid #dbe2ff;
-  background: #f4f7ff;
+  color: var(--person-tag-color);
+  border: 1px solid var(--person-tag-border);
+  background: var(--person-tag-bg);
   cursor: grab;
   width: min(168px, calc(100% - 4px));
   height: 28px;
@@ -1117,8 +1274,8 @@ main {
 }
 
 .person-tag.is-pinned {
-  border-color: #8190ff;
-  background: #eef0ff;
+  border-color: var(--primary);
+  background: var(--secondary);
 }
 
 .person-tag.is-pin-paused {
@@ -1224,7 +1381,8 @@ main {
 
 .settings-subtab {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card);
+  color: var(--text);
   padding: 8px 12px;
   border-radius: 999px;
   cursor: pointer;
@@ -1273,10 +1431,11 @@ main {
 .settings-subpanel .form-row select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-size: 14px;
-  background: #fff;
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .settings-subpanel .form-row textarea {
@@ -1304,9 +1463,9 @@ main {
 }
 
 .caution-chip {
-  border: 1px solid #dbe2ff;
-  background: #f4f7ff;
-  color: #1f2330;
+  border: 1px solid var(--person-tag-border);
+  background: var(--person-tag-bg);
+  color: var(--person-tag-color);
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
@@ -1314,7 +1473,7 @@ main {
 }
 
 .caution-chip:hover {
-  background: #e9eeff;
+  background: var(--card-hover);
 }
 
 .meal-list-card #store-list {
@@ -1407,8 +1566,8 @@ main {
 }
 
 .store-list .s-badge.warn {
-  background: #fff3cd;
-  color: #8a6d00;
+  background: var(--storage-warn-bg);
+  color: var(--storage-warn-color);
 }
 
 .store-list .s-actions .pick {
@@ -1433,9 +1592,9 @@ main {
   max-width: 820px;
   margin: 0 auto 12px;
   padding: 12px 16px;
-  background: #fff3cd;
-  border: 1px solid #ffe69c;
-  color: #6b5400;
+  background: var(--storage-warn-bg);
+  border: 1px solid var(--storage-warn-border);
+  color: var(--storage-warn-color);
   border-radius: 10px;
   font-size: 13px;
 }
@@ -1455,7 +1614,7 @@ main {
 }
 
 .app-footer code {
-  background: #eef0ff;
+  background: var(--footer-code-bg);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -1523,6 +1682,15 @@ main {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     padding: 14px 0 0;
+  }
+
+  .theme-toggle {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 40px;
+    height: 40px;
+    background: #2a2b34;
+    border-color: #4c4d57;
   }
 
   .meal-tab {
@@ -1916,6 +2084,15 @@ main {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
     padding: 2px 0 0;
+  }
+
+  .theme-toggle {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 42px;
+    height: 42px;
+    background: #2a2b34;
+    border-color: #4c4d57;
   }
 
   .meal-tab {

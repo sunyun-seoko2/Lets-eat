@@ -4,7 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>밥먹자!</title>
-  <link rel="stylesheet" href="styles.css?v=22" />
+  <link rel="stylesheet" href="styles.css?v=23" />
+  <script>
+    // Apply saved theme immediately to prevent flash of light theme
+    (function() {
+      var saved = localStorage.getItem('ls.theme.v1');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
 </head>
 <body>
   <div class="site-top">
@@ -19,6 +26,22 @@
       <button class="meal-tab" data-tab="fridayLunch" type="button">📅 금요일 점심</button>
       <button class="meal-tab" data-tab="dinner" type="button">🍻 저녁</button>
       <button class="meal-tab" data-tab="settings" type="button">⚙️ 설정</button>
+      <button id="theme-toggle" class="theme-toggle" type="button" title="다크모드 전환" aria-label="다크모드 전환">
+        <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="theme-icon moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
       </nav>
     <img class="tabs-side-img right" src="assets/tabs-right.png" alt="설정 버튼 오른쪽 이미지" />
     </div>

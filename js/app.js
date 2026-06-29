@@ -48,6 +48,7 @@
     bindTitleQuickSwitch();
     bindMapActions();
     bindStorageErrors();
+    bindThemeToggle();
 
     await maybeWeeklyHistoryReset();
     // 식사 타입 데이터 미리 로드
@@ -3206,6 +3207,27 @@
       `;
       banner.classList.remove('hidden');
       setTimeout(() => banner.classList.add('hidden'), 8000);
+    });
+  }
+
+  // ---------- Dark Mode Toggle ----------
+  const THEME_KEY = 'ls.theme.v1';
+
+  function bindThemeToggle() {
+    const btn = $('#theme-toggle');
+    if (!btn) return;
+    
+    btn.addEventListener('click', () => {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem(THEME_KEY, 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem(THEME_KEY, 'dark');
+      }
     });
   }
 })();
