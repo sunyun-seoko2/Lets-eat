@@ -5,16 +5,24 @@
  * - 마커 표시
  * - Naver Map URL 파싱: 이름, placeId, 좌표 추출 (best-effort)
  * - 지도 클릭으로 좌표 직접 지정 모드
+ * - 회사 ↔ 룰렛 당첨 가게 도보 동선 (직선 + 예상 도보 거리·시간)
  */
 (function () {
   let map = null;
   let markers = [];
+  let markerEntries = new Map(); // store.id → { marker, info }
   let fixedCompanyMarker = null;
   let fixedCompanyInfo = null;
   let pickModeListener = null;
   let pickModeCallback = null;
   let nextInfoWindowId = 1;
-  const DEFAULT_ZOOM = 17; // 종로권 기준 약 50m 축척
+  let walkLine = null;
+  let walkKey = '';
+  let walkStore = null;
+  // 도보 동선 추정: 실제 길은 직선보다 돌아가므로 우회 계수를 곱하고, 성인 평균 보행 속도로 시간 계산
+  const WALK_DETOUR_FACTOR = 1.3;
+  const WALK_METERS_PER_MINUTE = 75; // 4.5km/h
+  const DEFAULT_ZOOM = 17; // 종로권 기준 약 50m 축척 (메인 지도는 이 축척으로 고정)
   const FIXED_LOCATION = {
     name: '연강빌딩',
     roadAddress: '서울 종로구 종로33길 15',
@@ -47,7 +55,15 @@
       map = new naver.maps.Map(containerId, {
         center: new naver.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng),
         zoom: DEFAULT_ZOOM,
-        scrollWheel: true,
+        // 확대/축소 막기: 50m 축척 고정 (이동은 가능)
+        minZoom: DEFAULT_ZOOM,
+        maxZoom: DEFAULT_ZOOM,
+        zoomControl: false,
+        scrollWheel: false,
+        pinchZoom: false,
+        disableDoubleClickZoom: true,
+        disableDoubleTapZoom: true,
+        disableTwoFingerTapZoom: true,
       });
       ensureFixedCompanyMarker();
       this.resolveFixedLocation({ recenter: true }).catch((e) => {
@@ -57,8 +73,8 @@
 
     async reload(containerId) {
       this.disablePickMode();
-      markers.forEach((m) => m.setMap(null));
-      markers = [];
+      this.clearWalkRoute();
+      this.clearMarkers();
       if (fixedCompanyMarker) fixedCompanyMarker.setMap(null);
       fixedCompanyMarker = null;
       fixedCompanyInfo = null;
@@ -71,36 +87,57 @@
       this.init(containerId);
     },
 
+    /** 마커를 지우고, 말풍선이 열려 있던 가게 id 목록을 돌려줌 (다시 그릴 때 그대로 열어 두기 위함) */
     clearMarkers() {
+      const openIds = new Set();
+      markerEntries.forEach((entry, id) => {
+        if (entry.info.getMap()) openIds.add(id);
+        entry.info.close();
+      });
       markers.forEach((m) => m.setMap(null));
       markers = [];
+      markerEntries = new Map();
+      return openIds;
+    },
+
+    openStoreInfo(storeId) {
+      const entry = markerEntries.get(storeId);
+      if (!entry || entry.info.getMap()) return;
+      entry.info.open(map, entry.marker);
+      bindInfoWindowCloseButton(entry.info);
     },
 
     renderStores(stores, options = {}) {
       if (!ready() || !map) return;
-      this.clearMarkers();
+      const reopenIds = this.clearMarkers();
       const autoFit = options.autoFit === true;
       const bounds = autoFit ? new naver.maps.LatLngBounds() : null;
       let count = 0;
       stores.forEach((s) => {
         if (s.lat == null || s.lng == null) return;
         const position = new naver.maps.LatLng(s.lat, s.lng);
+        // 기본은 점 + 가게 이름. 말풍선이 열려 있을 때는 이름이 겹치지 않도록 점만 표시
+        const dotHtml =
+          '<span style="width:10px;height:10px;border-radius:50%;background:#2f57e5;display:inline-block;' +
+          'box-shadow:0 0 0 2px #fff,0 1px 2px rgba(0,0,0,.35)"></span>';
+        const labeledIcon = {
+          content:
+            '<div style="display:flex;align-items:center;gap:5px;transform:translateY(-6px)">' + dotHtml +
+            '<span style="background:rgba(255,255,255,.96);border:1px solid #d9dff8;border-radius:999px;' +
+            'padding:2px 8px;font-size:12px;font-weight:600;color:#1f2330;white-space:nowrap">' +
+            escapeHtml(s.name) +
+            '</span></div>',
+          anchor: new naver.maps.Point(12, 12),
+        };
+        const dotIcon = {
+          content: '<div style="display:flex;align-items:center;transform:translateY(-6px)">' + dotHtml + '</div>',
+          anchor: new naver.maps.Point(12, 12),
+        };
         const marker = new naver.maps.Marker({
           position,
           map,
           title: s.name,
-          // 기본적으로 가게 이름이 지도 위에 보이도록 커스텀 마커를 사용
-          icon: {
-            content:
-              '<div style="display:flex;align-items:center;gap:5px;transform:translateY(-6px)">' +
-              '<span style="width:10px;height:10px;border-radius:50%;background:#2f57e5;display:inline-block;' +
-              'box-shadow:0 0 0 2px #fff,0 1px 2px rgba(0,0,0,.35)"></span>' +
-              '<span style="background:rgba(255,255,255,.96);border:1px solid #d9dff8;border-radius:999px;' +
-              'padding:2px 8px;font-size:12px;font-weight:600;color:#1f2330;white-space:nowrap">' +
-              escapeHtml(s.name) +
-              '</span></div>',
-            anchor: new naver.maps.Point(12, 12),
-          },
+          icon: labeledIcon,
         });
         const cleanMemo = stripPlaceIdToken(s.memo);
         const infoId = makeInfoWindowId();
@@ -110,6 +147,11 @@
           disableAutoPan: true,
         });
         info.__closeButtonId = infoId;
+        // 말풍선을 열고 닫을 때(마커 클릭 · × 버튼 · 다시 그리기 모두) 가게 이름 표시를 함께 전환
+        const openInfo = info.open.bind(info);
+        const closeInfo = info.close.bind(info);
+        info.open = (...args) => { marker.setIcon(dotIcon); return openInfo(...args); };
+        info.close = (...args) => { marker.setIcon(labeledIcon); return closeInfo(...args); };
         // 클릭 시 토글 (이미 열려있으면 닫기)
         naver.maps.Event.addListener(marker, 'click', () => {
           if (info.getMap()) info.close();
@@ -119,6 +161,8 @@
           }
         });
         markers.push(marker);
+        markerEntries.set(s.id, { marker, info });
+        if (reopenIds.has(s.id)) this.openStoreInfo(s.id);
         if (autoFit) {
           bounds.extend(position);
           count++;
@@ -169,7 +213,12 @@
         }
       }
       ensureFixedCompanyMarker();
-      if (options.recenter === true) {
+      if (walkStore) {
+        // 회사 좌표가 보정됐으면 동선도 새 좌표로 다시 그림
+        const store = walkStore;
+        walkKey = '';
+        this.showWalkRoute(store);
+      } else if (options.recenter === true) {
         map.setCenter(new naver.maps.LatLng(FIXED_LOCATION.lat, FIXED_LOCATION.lng));
       }
       return {
@@ -289,7 +338,79 @@
     },
 
     isPickMode() { return pickModeListener != null; },
+
+    getCompanyLocation() {
+      return { name: FIXED_LOCATION.name, lat: FIXED_LOCATION.lat, lng: FIXED_LOCATION.lng };
+    },
+
+    /** 회사 → 가게 직선거리와 예상 도보 거리·시간 */
+    estimateWalk(store) {
+      if (!store || store.lat == null || store.lng == null) return null;
+      const straightM = distanceMeters(FIXED_LOCATION.lat, FIXED_LOCATION.lng, store.lat, store.lng);
+      const walkM = straightM * WALK_DETOUR_FACTOR;
+      return {
+        straightM: Math.round(straightM),
+        walkM: Math.round(walkM),
+        minutes: Math.max(1, Math.ceil(walkM / WALK_METERS_PER_MINUTE)),
+      };
+    },
+
+    /**
+     * 회사와 가게를 점선으로 잇기 (예상 도보 시간은 지도 아래 문구로 표시).
+     * 처음 그릴 때 지도 중심을 회사와 가게의 정가운데로 옮기고 가게 말풍선을 연다.
+     * 같은 가게면 다시 그리지 않음 (사용자가 닫은 말풍선을 다시 열지 않도록).
+     */
+    showWalkRoute(store) {
+      const estimate = this.estimateWalk(store);
+      if (!ready() || !map || !estimate) {
+        this.clearWalkRoute();
+        return estimate;
+      }
+      const key = [store.id, store.lat, store.lng, FIXED_LOCATION.lat, FIXED_LOCATION.lng].join(':');
+      if (key === walkKey && walkLine) return estimate;
+      this.clearWalkRoute();
+      walkKey = key;
+      walkStore = store;
+
+      const from = new naver.maps.LatLng(FIXED_LOCATION.lat, FIXED_LOCATION.lng);
+      const to = new naver.maps.LatLng(store.lat, store.lng);
+      walkLine = new naver.maps.Polyline({
+        map,
+        path: [from, to],
+        strokeColor: '#e5484d',
+        strokeWeight: 4,
+        strokeOpacity: 0.9,
+        strokeStyle: 'shortdash',
+        strokeLineCap: 'round',
+      });
+      map.setCenter(new naver.maps.LatLng((store.lat + FIXED_LOCATION.lat) / 2, (store.lng + FIXED_LOCATION.lng) / 2));
+      this.openStoreInfo(store.id);
+      return estimate;
+    },
+
+    clearWalkRoute() {
+      if (walkLine) walkLine.setMap(null);
+      walkLine = null;
+      walkKey = '';
+      walkStore = null;
+    },
+
+    formatMeters,
   };
+
+  function distanceMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2
+      + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function formatMeters(m) {
+    return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
+  }
 
   function safeDecode(s) {
     try { return decodeURIComponent(s); } catch { return s; }

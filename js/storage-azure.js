@@ -4,8 +4,9 @@
  * 데이터 모델:
  *   stores 테이블: PartitionKey = meal key (예: lunch | dinner | fridayLunch), RowKey = store.id,
  *                  Payload (JSON 문자열, 가게 정보 전체)
- *   votes  테이블: PartitionKey = meal key (예: lunch | dinner | fridayLunch), RowKey = 'current'|'roulette_current',
+ *   votes  테이블: PartitionKey = 'general' (자유 투표) 또는 meal key (룰렛), RowKey = 'current'|'roulette_current'|'history_*',
  *                  Payload (JSON 문자열, 투표/룰렛 정보 전체)
+ *                  PartitionKey = 'roulette_history', RowKey = 룰렛 세션 id 로 룰렛 기록 보관
  *   people 테이블: PartitionKey = 'shared', RowKey = 'current',
  *                  Payload (JSON 문자열, 대상자/입맛보호/오늘점심구분 데이터)
  *   randomhistory 테이블: PartitionKey = meal key, RowKey = random history id,
@@ -29,6 +30,7 @@
   const TABLE_VOTES  = cfg.tableVotes  || 'votes';
   const TABLE_PEOPLE = cfg.tablePeople || 'people';
   const TABLE_RANDOM_HISTORY = cfg.tableRandomHistory || 'randomhistory';
+  const ROULETTE_HISTORY_PK = 'roulette_history';
 
   if (!ACCOUNT || !SAS) {
     console.error('[storage-azure] account 또는 sas 가 설정되지 않았습니다. localStorage 로 폴백.');
@@ -232,6 +234,31 @@
     async clearRoulette(meal) {
       await ensureInit();
       await deleteEntity(TABLE_VOTES, meal, 'roulette_current');
+    },
+
+    // RowKey 를 룰렛 세션 id 로 써서 여러 브라우저가 같은 결과를 저장해도 1건만 남음
+    async getRouletteHistory() {
+      await ensureInit();
+      const entities = await listEntities(TABLE_VOTES, ROULETTE_HISTORY_PK);
+      return entities.map(parsePayload).filter(Boolean);
+    },
+
+    async saveRouletteHistory(record) {
+      await ensureInit();
+      await putEntity(TABLE_VOTES, ROULETTE_HISTORY_PK, String(record.id), { Payload: JSON.stringify(record) });
+    },
+
+    async deleteRouletteHistory(recordId) {
+      await ensureInit();
+      await deleteEntity(TABLE_VOTES, ROULETTE_HISTORY_PK, String(recordId));
+    },
+
+    async clearRouletteHistory() {
+      await ensureInit();
+      const entities = await listEntities(TABLE_VOTES, ROULETTE_HISTORY_PK);
+      await Promise.all(entities.map((e) =>
+        deleteEntity(TABLE_VOTES, ROULETTE_HISTORY_PK, e.RowKey).catch((err) => console.error('clear roulette history delete:', err))
+      ));
     },
 
     async getVoteHistory(meal) {

@@ -1,247 +1,308 @@
-# 🍽️ 점심 / 저녁 가게 리스트
+<div align="center">
 
-점심 / 저녁 식사 가게를 등록하고, 네이버 지도로 위치를 확인하고, 룰렛으로 무작위 선택하거나, 시간 제한이 있는 투표를 진행할 수 있는 정적 웹앱입니다.
+# 🍽️ 밥먹자!
 
-GitHub Pages 같은 정적 호스팅에서 바로 동작합니다.
+**오늘 뭐 먹지?** — 팀의 점심 메뉴 고민은 룰렛으로, 그 밖의 결정은 투표로 끝내는 웹앱
 
-## 기능
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/Vanilla_JS-F7DF1E?logo=javascript&logoColor=black)
+![Naver Maps](https://img.shields.io/badge/Naver_Maps-03C75A?logo=naver&logoColor=white)
+![Azure Table Storage](https://img.shields.io/badge/Azure_Table_Storage-0078D4?logo=microsoftazure&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
-- 🥗 점심 / 🍻 저녁 탭으로 가게 리스트 분리 관리
-- 가게 등록: 이름, 네이버 지도 URL, 주소, 좌표, 메모
-  - URL에서 좌표 자동 추출 시도
-  - 주소 입력 시 Naver Geocoder로 좌표 자동 채움
-- 🗺️ 네이버 지도 마커 표시 + 클릭 시 정보창
-- 🎯 룰렛: 등록 가게 중 **최대 5개**를 랜덤으로 뽑아 캔버스 룰렛으로 추첨
-- 🗳️ 투표: 후보를 랜덤 선정, **시작/종료 시간**을 설정해 해당 시간대에만 투표 가능
-  - 투표자 이름 필수 입력 (이름 기준 1인 1표)
+</div>
 
-## 빠른 시작 (로컬)
+---
 
-이 폴더에서 정적 파일을 그대로 브라우저에 띄우면 됩니다.
+## 목차
 
-```powershell
-# 옵션 1: Python 간이 서버
+- [소개](#소개)
+- [주요 기능](#주요-기능)
+- [빠른 시작](#빠른-시작)
+- [설정](#설정)
+- [배포 (GitHub Pages)](#배포-github-pages)
+- [데이터 저장](#데이터-저장)
+- [시간 규칙](#시간-규칙)
+- [프로젝트 구조](#프로젝트-구조)
+- [보안 주의](#보안-주의)
+- [알려진 한계](#알려진-한계)
+- [라이선스](#라이선스)
+
+## 소개
+
+**밥먹자!** 는 빌드 과정 없이 HTML · CSS · Vanilla JS 만으로 동작하는 정적 웹앱입니다.
+가게를 등록하고 네이버 지도로 위치를 확인한 뒤, 평일 11:00에 자동으로 도는 **룰렛** 으로 오늘 점심을 정합니다.
+음료수 내기처럼 식사와 상관없는 결정은 **자유 투표** 로 정할 수 있습니다.
+
+Azure Table Storage 를 저장소로 쓰면 여러 사람이 같은 화면을 거의 실시간으로 공유하므로, 팀 전체가 하나의 룰렛·투표를 함께 볼 수 있습니다.
+
+## 주요 기능
+
+### 🍱 화면 구성
+| 탭 | 설명 |
+|---|---|
+| 🥗 점심 | 메인 화면: 오늘의 인원 배치 · 랜덤 룰렛 · 지도 · 자유 투표 |
+| ⚙️ 설정 | 대상자 / 가게 / 입맛 보호 / 기록 관리 |
+
+메인 화면 배치 (데스크톱 기준)
+
+| 1열 | 2열 | 3열 |
+|---|---|---|
+| 👥 오늘의 인원 배치 | 🎯 랜덤 룰렛 | 🗺️ 지도 |
+| 🗳️ 자유 투표 (1~2열) | | |
+
+모바일에서는 인원 배치 → 룰렛 → 지도 → 투표 순서로 세로로 쌓입니다.
+
+**금요일 점심**: 별도 탭은 없지만 가게 목록은 따로 관리됩니다. 금요일에는 점심 탭의 룰렛과 지도가 *금요일 점심* 가게로 바뀝니다.
+
+> [!NOTE]
+> 🍻 **저녁 탭은 현재 숨김 상태** 입니다. 탭과 함께 설정 메뉴의 저녁 선택지(중복 허용 · 못 가는 가게 선택 · 기록 관리 필터)와 오후의 "오늘 저녁 및 회식" 제목도 숨겨집니다. 기능 코드와 데이터는 그대로 있으며, `js/config.js` 의 `showDinnerTab` 을 `true` 로 바꾸면 모두 다시 나타납니다.
+
+### 👥 오늘의 인원 배치
+- 대상자를 **외식 파견단 / 도시락 본부 / 대상자** 세 그룹으로 나눠 관리
+- 위치 **고정** 기능: 고정한 사람은 월~목 점심 시간대에 초기화되지 않음
+- 모바일에서는 탭(터치) 메뉴로 그룹 이동
+
+### 🏪 가게 등록
+- 이름 · 네이버 지도 URL · 주소 · 좌표 · 메모
+- 새 가게는 **점심** 에 등록됩니다. 금요일 점심에도 쓰려면 설정의 가게 목록에서 **중복 허용** 으로 *금요일 점심* 을 선택합니다. *점심* 을 해제하면 금요일 전용 가게가 됩니다.
+- 설정의 가게 목록에는 점심 · 금요일 점심 가게가 모두 나오고, 이름 옆에 룰렛에 쓰이는 탭이 표시됩니다.
+- **🪄 URL로 빠른 등록**: 네이버 지도 URL만 붙여넣으면 정보 자동 추출
+  1. URL 파싱 → 이름 / `placeId` / `c=` 좌표
+  2. `placeId` 가 있으면 CORS 프록시로 `m.place.naver.com` 을 읽어 이름·주소·좌표·전화번호·카테고리 추출
+  3. 좌표가 없으면 이름으로 Naver Geocoder 검색
+  4. 그래도 없으면 **📍 지도에서 좌표 지정** 으로 직접 클릭
+
+### 🗺️ 지도
+- **오늘 룰렛 당첨 가게만** 지도에 표시합니다. 결과가 나오기 전에는 회사(🏢)만 보입니다. 마커를 누르면 상세 정보 말풍선이 열리고, 말풍선이 열려 있는 동안에는 겹치지 않도록 마커의 가게 이름을 숨깁니다 (말풍선 글자는 다크 모드에서도 검정).
+- **축척 고정**: 메인 지도는 약 50m 축척(줌 17)으로 고정되어 확대·축소가 되지 않습니다. 드래그로 이동은 가능합니다.
+- **🚶 도보 동선**: 룰렛 결과가 나오면 회사(🏢)와 당첨 가게를 빨간 점선으로 잇고, 예상 도보 시간은 지도 아래 문구로 표시합니다.
+  - 지도 중심이 회사와 가게의 정가운데로 옮겨지고, 당첨 가게의 말풍선(상세 정보)이 열린 상태로 나옵니다. 말풍선을 닫으면 다시 열리지 않습니다.
+  - 지도 아래에 *회사 → 가게 · 도보 약 N분 (약 Xm, 직선 Ym)* 문구가 함께 나옵니다.
+  - 실제 길을 따라가는 경로가 아니라 **직선거리 × 1.3 (우회 보정)** 을 평균 보행 속도 4.5km/h로 나눈 **예상값** 입니다. 네이버 지도 API는 도보 길찾기를 제공하지 않습니다.
+  - 룰렛이 도는 동안에는 결과가 미리 보이지 않도록 숨기고, 좌표가 없는 가게는 안내 문구만 표시합니다.
+- 📍 내 위치로 이동
+
+### 🎯 랜덤 룰렛
+버튼 없이 **완전 자동** 으로 동작합니다.
+
+- **⏰ 평일 11:00 자동 실행**: 월~목은 *점심*, 금요일은 *금요일 점심* 가게 중 랜덤 5곳을 뽑아 룰렛을 돌립니다. 어느 요일이든 점심 탭에서 보입니다.
+  - 이번 주 당첨 가게와 입맛 보호 대상자가 못 가는 가게는 후보에서 빠집니다.
+  - 11:00에 아무도 접속해 있지 않았다면 13:00 전에 처음 접속한 사람의 화면에서 실행됩니다. 13:00이 지나면 그날은 건너뜁니다.
+- 모든 접속자의 화면에서 **같은 룰렛이 동시에** 회전
+- 하루 1회 — 결과는 다음날 09:00에 자동으로 지워집니다.
+- 🕘 **이전 룰렛 기록** 팝업: 최근 **15개** 까지 보관하며, 16번째부터는 가장 오래된 기록이 지워집니다.
+  - 표시 항목: No · 룰렛 시간(날짜·요일 포함) · 당첨 가게 · 식사 탭 · 실행 구분(11:00 정시 / 늦은 실행) · 당시 외식 인원 · 후보 가게 목록
+  - 기록 전체 삭제는 관리자 암호가 필요합니다.
+- 주말과 저녁에는 룰렛을 쓰지 않습니다.
+
+> [!NOTE]
+> 서버가 없는 앱이라 **11:00에 누군가 페이지를 열어 두고 있어야** 정시에 돕니다. 여러 명이 열어 두어도 같은 날짜로 계산한 후보·당첨이 같아서 결과는 하나로 맞춰집니다. 브라우저가 백그라운드 탭의 타이머를 늦추면 최대 1분쯤 늦게 시작할 수 있습니다.
+
+### 🗳️ 자유 투표
+식사와 별개로 쓰는 일반 투표입니다. 음료수 내기, 회식 날짜 정하기 등 무엇이든 물어볼 수 있습니다. 모든 탭에서 같은 투표 하나가 보입니다.
+
+- **제목 · 설명 · 선택지(2~10개)** 를 직접 입력
+- **참여 인원 지정**: 등록된 대상자가 *참여 / 미참여* 두 칸으로 나뉘어 표시되고, **이름을 한 번 누르면 반대 칸으로 이동**합니다.
+  - 기본값은 전원 참여이며, *전체 참여 / 전체 제외* 버튼도 있습니다.
+  - 투표 진행 중에도 이동할 수 있습니다. 이미 투표한 사람을 미참여로 옮기면 확인 후 그 표가 취소됩니다.
+- **옵션**: 복수 선택 허용, 익명 투표 (누가 무엇을 골랐는지 숨김. 투표 여부는 표시)
+- **시작 / 종료 시간** 을 정해 그 시간에만 투표 가능
+- 참여 인원만 투표할 수 있고, 진행 중에는 **표를 바꿀 수 있습니다** (이름 기준 1인 1표)
+- 실시간 현황: 선택지별 득표·비율·투표자, *N명 중 M명 투표*, 아직 투표 안 한 사람
+- 종료되면 🏆 결과(공동 1위 포함)를 보여주고, **새 투표 만들기** 를 누르면 기록으로 보관됩니다.
+- 진행 중인 투표의 종료/삭제와 기록 삭제는 관리자 암호가 필요합니다.
+- 🕘 **이전 투표 기록** 조회 (종료 다음날 09:30에 자동 보관)
+
+### 💚 입맛 보호 대상자
+- 사람별 **주의 태그** (예: 매운 음식 X) 등록
+- 사람별 **못 가는 가게** 지정 → 그 사람이 *외식 파견단* 에 있으면 해당 가게가 랜덤 후보에서 자동 제외
+
+### 🗂️ 중복 방지 기록
+- 이번 주(월~금) 룰렛에서 **당첨된 가게는 랜덤 후보에서 제외**
+- 매주 **토요일 10:00** 에 지난주 기록 일괄 초기화
+- 설정 탭에서 기록 조회 / 삭제 (관리자 암호 필요)
+
+### 🌙 다크 모드
+- 헤더의 토글로 전환, 브라우저에 저장
+
+## 빠른 시작
+
+정적 파일이므로 아무 정적 서버로 띄우면 됩니다.
+
+```bash
+# Python
 python -m http.server 8000
-# → http://localhost:8000
 
-# 옵션 2: VS Code Live Server, http-server 등 어떤 정적 서버도 OK
+# 또는 Node
+npx http-server -p 8000
 ```
 
-> ⚠️ `file://` 로 직접 열면 네이버 지도 API가 도메인 인증에 실패할 수 있어요. 가급적 `localhost` 로 띄우세요.
+→ <http://localhost:8000>
 
-## GitHub Pages 배포
+> [!WARNING]
+> `file://` 로 직접 열면 네이버 지도 API 도메인 인증이 실패합니다. 반드시 `localhost` 로 띄우세요.
 
-1. GitHub에서 새 repository 생성 (예: `lunch-dinner-list`)
-2. 이 폴더에서 git 세팅:
-   ```powershell
-   git init
-   git add .
-   git commit -m "Initial commit: lunch/dinner list app"
-   git branch -M main
-   git remote add origin https://github.com/<USERNAME>/<REPO>.git
-   git push -u origin main
-   ```
-3. GitHub repo → **Settings → Pages**
-   - Source: `Deploy from a branch`
-   - Branch: `main` / `/ (root)` 선택 → Save
-4. 1~2분 후 `https://<USERNAME>.github.io/<REPO>/` 로 접속
+> [!TIP]
+> Azure 설정 없이 혼자 써보려면 `js/config.js` 의 `storage` 를 `'local'` 로 바꾸세요. 데이터가 브라우저 localStorage 에만 저장됩니다.
 
-### Naver Cloud Platform 도메인 등록
+## 설정
 
-Naver Maps API는 호출 도메인이 사전 등록되어 있어야 합니다.
+모든 설정은 [`js/config.js`](js/config.js) 의 `window.AppConfig` 에 있습니다.
 
-- Naver Cloud Platform 콘솔 → Maps Application → Web Service URL에 아래 도메인 추가:
-  - `http://localhost:8000`
-  - `https://<USERNAME>.github.io`
+| 키 | 기본값 | 설명 |
+|---|---|---|
+| `storage` | `'azure'` | `'azure'` = 공유 저장소, `'local'` = 브라우저 단독 |
+| `azure.account` | — | Storage Account 이름 |
+| `azure.sas` | — | SAS 토큰 (앞의 `?` 제외) |
+| `azure.tableStores` · `tableVotes` · `tablePeople` · `tableRandomHistory` | `stores` · `votes` · `people` · `randomhistory` | 테이블 이름 |
+| `corsProxy` | `https://corsproxy.io/?url=` | 네이버 place 페이지를 가져올 CORS 프록시 |
+| `placeLookup` | `true` | URL 빠른 등록 시 자동 추출 사용 여부 |
+| `pollIntervalMs` | `3000` | 평시 폴링 간격 (ms) |
+| `pollIntervalVoteMs` | `3000` | 투표 진행 중 폴링 간격 (ms) |
+| `pollIntervalRouletteMs` | `1000` | 룰렛 회전 중 폴링 간격 (ms) |
+| `rouletteSpinLeadMs` | `2000` | 다른 브라우저가 회전을 받을 수 있도록 시작 전 대기 (ms) |
+| `rouletteSpinDurationMs` | `8000` | 룰렛 회전 시간 (ms) |
+| `showDinnerTab` | `false` | 저녁 탭과 설정 메뉴의 저녁 선택지 표시 여부 (끄면 화면에서만 숨김) |
 
-> 등록 후 1~2분이 지나야 반영됩니다. 이 작업이 빠져 있으면 `Authentication Failed` 가 발생합니다.
+### 네이버 지도 API 키
 
-## 🔐 보안 주의
-
-- **Naver Maps Client ID** 는 브라우저 코드에 포함되어도 안전합니다 (도메인 인증으로 보호).
-- **Secret Key** 는 절대 클라이언트 코드에 포함하지 마세요. 이 프로젝트는 Secret Key를 사용하지 않습니다.
-  - 만약 이미 노출되었다면 NCP 콘솔에서 즉시 **재발급** 하세요.
-
-현재 `index.html` 의 스크립트 태그:
+`index.html` 하단의 스크립트 태그에서 `ncpKeyId` 를 본인 키로 바꿉니다.
 
 ```html
-<script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=ufhtl7ialy&submodules=geocoder"></script>
+<script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=<YOUR_KEY_ID>&submodules=geocoder"></script>
 ```
 
-- 새 NCP 계정은 `ncpKeyId` 사용
-- 구 계정은 `ncpClientId` 사용
-- 인증 오류 시 두 파라미터를 서로 바꿔보세요.
+- 새 NCP 계정은 `ncpKeyId`, 구 계정은 `ncpClientId` 를 사용합니다. 인증 오류가 나면 서로 바꿔보세요.
+- **NCP 콘솔 → Maps → Application → Web Service URL** 에 접속 도메인을 등록해야 합니다.
+  - `http://localhost:8000`
+  - `https://<USERNAME>.github.io`
+- 등록 후 반영까지 1~2분 걸립니다. 빠지면 `Authentication Failed` 가 발생합니다.
 
-## 🌐 URL 자동 등록 (place 정보 자동 추출)
+### CORS 프록시 교체 (선택)
 
-설정 탭의 **URL로 빠른 등록**에 네이버 지도 URL을 붙여넣으면 다음 순서로 가게 정보를 자동 채웁니다:
-
-1. URL 파싱 → 이름 / placeId / c= 좌표 추출
-2. placeId 가 있으면 → 공개 CORS 프록시(`corsproxy.io`)를 통해 `m.place.naver.com` HTML 을 받아 **이름·주소·좌표·전화번호·카테고리** 파싱
-3. 여전히 좌표가 없으면 → 이름으로 Naver Geocoder 호출
-4. 그래도 못 찾으면 → 가게는 등록되되 "📍 지도에서 지정" 으로 좌표를 직접 클릭하여 지정
-
-### 한계 및 주의사항
-
-- 공식 API가 아닌 **HTML 스크래핑** 이라 네이버 페이지 구조 변경 시 파싱이 깨질 수 있습니다 (코드 수정으로 대응).
-- 공개 CORS 프록시(`corsproxy.io`)는 가끔 느리거나 다운될 수 있습니다.
-- 트래픽이 많으면 프록시에서 차단될 수 있습니다.
-
-### 프록시 교체 (선택)
-
-`js/config.js` 의 `corsProxy` 값을 자체 프록시 URL로 바꾸세요.
+공개 프록시(`corsproxy.io`)는 느리거나 차단될 수 있습니다. Cloudflare Worker / Azure Function 등으로 자체 프록시를 두고 `corsProxy` 값을 바꾸면 안정적입니다.
 
 ```js
-window.AppConfig = {
-  corsProxy: 'https://your-worker.your-subdomain.workers.dev/?url=',
-  placeLookup: true,
-};
+corsProxy: 'https://your-worker.your-subdomain.workers.dev/?url=',
 ```
 
-자체 Cloudflare Worker / Azure Function 으로 프록시를 두면 안정성·속도·신뢰성이 향상됩니다.
+더 정확한 방법은 HTML 스크래핑 대신 [Naver Developers 지역 검색 API](https://developers.naver.com/docs/serviceapi/search/local/local.md)를 쓰는 것입니다. 이 경우 Client Secret 은 프록시 환경변수에 두고, [`js/naver-api.js`](js/naver-api.js) 를 해당 API 호출로 교체하세요.
 
-### 정확하고 안정적인 방법 (선택)
+## 배포 (GitHub Pages)
 
-HTML 스크래핑 대신 **Naver Developers Local Search API** 를 사용하면 더 정확합니다:
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/<USERNAME>/<REPO>.git
+git push -u origin main
+```
 
-1. https://developers.naver.com/apps/#/register → "검색" 선택
-2. 웹 서비스 URL에 배포 도메인 등록
-3. 발급되는 Client ID + Secret 으로 `openapi.naver.com/v1/search/local.json` 호출
-4. CORS 우회를 위해 여전히 프록시 1개 필요 (비밀키도 프록시 환경변수에 보관)
+1. GitHub repo → **Settings → Pages**
+2. Source: `Deploy from a branch` · Branch: `main` / `(root)` → **Save**
+3. 1~2분 후 `https://<USERNAME>.github.io/<REPO>/` 접속
+4. 위 도메인을 [NCP Web Service URL](#네이버-지도-api-키) 과 [Azure CORS](#azure-준비) 에 등록
 
-이 경로로 가시려면 `js/naver-api.js` 를 위 API 호출로 바꾸시면 됩니다.
+> [!NOTE]
+> `index.html` 의 스크립트에는 `?v=11` 같은 캐시 버스팅 쿼리가 붙어 있습니다. JS 를 수정해 배포할 때 숫자를 올려야 사용자 브라우저에 바로 반영됩니다.
 
 ## 데이터 저장
 
-`js/config.js` 의 `storage` 값으로 저장소를 선택합니다:
+`storage` 값에 따라 어댑터가 선택됩니다.
 
-- `storage: 'azure'` — **Azure Table Storage** 사용 (현재 기본값). 여러 사용자 간 실시간 공유.
-- `storage: 'local'` — 브라우저 localStorage (해당 브라우저에만 저장).
+| 모드 | 어댑터 | 공유 | 용도 |
+|---|---|---|---|
+| `'azure'` | [`js/storage-azure.js`](js/storage-azure.js) | ✅ 여러 사용자 | 팀 운영 |
+| `'local'` | [`js/storage.js`](js/storage.js) | ❌ 해당 브라우저만 | 개발 · 개인 사용 |
 
-현재 연결 정보 (`js/config.js`):
-- Storage Account: `agenthta1de`
-- Tables: `stores`, `votes`, `people`, `randomhistory`
-- SAS 만료: **2028-05-01** (만료 전 재발급 필요)
+### Azure 테이블
 
-### 폴링 (실시간 동기화)
+| 테이블 | 내용 |
+|---|---|
+| `stores` | 가게 목록 |
+| `votes` | 자유 투표(`PartitionKey = general`) · 이전 투표 기록 · 식사별 룰렛 세션 · 이전 룰렛 기록(`PartitionKey = roulette_history`, 최대 15개) |
+| `people` | 대상자 · 그룹 배치 · 고정 · 입맛 보호 정보 |
+| `randomhistory` | 이번 주 당첨 기록 (랜덤 후보 제외용) |
 
-Azure 모드에서는 데이터를 주기적으로 다시 읽어와 UI를 갱신합니다.
-- 평시: 3초 (`pollIntervalMs`)
-- 투표 진행 중: 3초 (`pollIntervalVoteMs`)
-- 룰렛 회전 중: 1초 (`pollIntervalRouletteMs`)
-- 룰렛은 다른 브라우저가 회전 세션을 받을 수 있도록 기본 2초 뒤 시작하고 8초 동안 재생됩니다.
-- 룰렛 결과가 나온 뒤에는 수동 초기화 전까지 다시 돌릴 수 없으며, 다음날 09:00(서울)에 자동 초기화됩니다.
-- 탭이 백그라운드일 때는 일시 중단
+### Azure 준비
 
-간격은 `js/config.js` 에서 조정 가능.
-
-### 동시성 한계
-
-투표는 "최신 읽기 → 변경 → 쓰기" 패턴으로 race window 를 줄였지만, 완전한 ETag 기반 낙관적 동시성은 아닙니다. 같은 순간(수십 ms 차이)에 여러 사람이 투표하면 한 명의 표가 유실될 수 있습니다. 이때 다시 투표 버튼을 누르면 됩니다.
-
-## (선택) Azure Table Storage 연동
-
-`js/storage.js` 가 어댑터 패턴으로 작성되어 있어, 아래 인터페이스만 동일하게 구현하면 `window.Storage` 를 교체해서 사용할 수 있습니다.
-
-```js
-window.Storage = {
-  getStores(meal): Promise<Store[]>,
-  saveStores(meal, stores): Promise<void>,
-  getVote(meal): Promise<Vote|null>,
-  saveVote(meal, vote): Promise<void>,
-  clearVote(meal): Promise<void>,
-};
-```
-
-### Azure 측 사전 작업
-
-1. Azure Storage Account 생성
-2. Table Service → 테이블 네 개 생성 (예: `stores`, `votes`, `people`, `randomhistory`)
-   - `stores`: 가게 목록
-   - `votes`: 투표 데이터
-   - `people`: 대상자/입맛 보호 대상자/오늘 점심 구분(외식·도시락) 데이터
-   - `randomhistory`: 랜덤 룰렛/투표 후보 무작위 선정 5일 제외 기록
-3. **CORS 설정** (Storage account → Resource sharing (CORS) → Table service):
-   - Allowed origins: `https://<USERNAME>.github.io`
+1. **Storage Account** 생성
+2. **Table Service** 에서 위 네 개 테이블 생성
+3. **Resource sharing (CORS) → Table service**
+   - Allowed origins: `https://<USERNAME>.github.io`, `http://localhost:8000`
    - Allowed methods: `GET, POST, PUT, DELETE, OPTIONS, MERGE`
-   - Allowed headers: `*`, Exposed: `*`, Max age: `3600`
-4. **SAS 토큰 발급** (Shared access signature)
-   - Allowed services: Table
-   - Allowed resource types: Service, Container, Object
-   - Allowed permissions: Read, Write, Delete, List, Add, Update
-   - Start/Expiry: 짧게 (예: 하루)
-   - 결과 SAS token 문자열 보관
+   - Allowed / Exposed headers: `*` · Max age: `3600`
+4. **Shared access signature** 발급
+   - Services: Table · Resource types: Service, Container, Object
+   - Permissions: Read, Write, Delete, List, Add, Update
+   - 만료일은 운영 기간에 맞게 지정하고 **만료 전에 재발급**
+5. `js/config.js` 의 `azure.account`, `azure.sas` 에 입력
 
-> ⚠️ 위 SAS 토큰을 그대로 클라이언트 JS에 박으면 누구나 쓰기 권한을 갖게 됩니다. **사내/지인 그룹용 비공개 페이지**가 아니라면 권장하지 않으며, 더 안전한 방법은 **Azure Function 등 경량 백엔드**를 두어 거기서 SAS를 발급/검증하는 것입니다.
+### 실시간 동기화
 
-### 어댑터 예시 (`js/storage-azure.js`)
+Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니다.
 
-```js
-(function () {
-  const ACCOUNT = 'YOUR_STORAGE_ACCOUNT';
-  const SAS = 'sv=...&sig=...';   // SAS token (no leading '?')
-  const BASE = `https://${ACCOUNT}.table.core.windows.net`;
+- 평시 · 투표 중 3초, 룰렛 회전 중 1초
+- 룰렛은 2초 뒤 시작해 8초간 회전 → 다른 브라우저도 같은 회전을 재생
+- 탭이 백그라운드에 있으면 폴링 일시 중단
 
-  async function call(path, method='GET', body=null) {
-    const url = `${BASE}/${path}${path.includes('?') ? '&' : '?'}${SAS}`;
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'Accept': 'application/json;odata=nometadata',
-        'Content-Type': 'application/json',
-        'x-ms-version': '2019-02-02',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!res.ok && res.status !== 404) throw new Error(`Azure ${res.status}`);
-    return res.status === 404 ? null : (res.status === 204 ? null : res.json());
-  }
+## 시간 규칙
 
-  const PK = (meal) => `meal_${meal}`;
+모든 시간은 **서울(Asia/Seoul)** 기준입니다.
 
-  window.Storage = {
-    async getStores(meal) {
-      const data = await call(`Stores()?$filter=PartitionKey eq '${PK(meal)}'`);
-      return (data?.value || []).map((r) => JSON.parse(r.Payload));
-    },
-    async saveStores(meal, stores) {
-      // 간단 구현: 기존 row 삭제 후 재저장 (운영용은 upsert 권장)
-      // 생략 — 자세한 흐름은 Azure SDK 문서 참고
-    },
-    async getVote(meal) {
-      const data = await call(`Votes(PartitionKey='${PK(meal)}',RowKey='current')`);
-      return data ? JSON.parse(data.Payload) : null;
-    },
-    async saveVote(meal, vote) {
-      await call(`Votes(PartitionKey='${PK(meal)}',RowKey='current')`, 'PUT', {
-        PartitionKey: PK(meal), RowKey: 'current', Payload: JSON.stringify(vote),
-      });
-    },
-    async clearVote(meal) {
-      await call(`Votes(PartitionKey='${PK(meal)}',RowKey='current')`, 'DELETE');
-    },
-  };
-})();
-```
+| 규칙 | 시간 |
+|---|---|
+| 금요일 점심 가게로 전환 | 금요일 하루 동안 (룰렛 · 지도) |
+| 자동 탭 선택 — 저녁 | 평일 13:30 ~ 19:00 (저녁 탭을 켰을 때만) |
+| 점심 룰렛 자동 실행 | 평일 11:00 (월~목 *점심*, 금 *금요일 점심*) · 13:00까지 미실행분 보충 |
+| 룰렛 자동 초기화 | 매일 09:00 |
+| 종료된 투표 자동 보관 | 종료 다음날 09:30 |
+| 인원 고정 적용 | 월~목 10:50 ~ 13:30 |
+| 인원 고정 해제 | 13:30 이후, 금요일 (다음 평일 10:50 재적용) |
+| 당첨 기록 대상 | 월~금 결과만 |
+| 당첨 기록 초기화 | 매주 토요일 10:00 |
 
-그 다음 `index.html` 의 `<script src="js/storage.js"></script>` 를 `storage-azure.js` 로 바꿔주세요.
-
-## 파일 구조
+## 프로젝트 구조
 
 ```
-/
-├── index.html
-├── styles.css
-├── README.md
+.
+├── index.html            # 화면 구조 + 스크립트 로드
+├── styles.css            # 전체 스타일 (라이트/다크 테마)
+├── assets/               # 헤더 · 탭 장식 이미지
 └── js/
-    ├── storage.js     # localStorage 어댑터 (Azure 등으로 교체 가능)
-    ├── stores.js      # 가게 CRUD
-    ├── maps.js        # 네이버 지도 + Geocoder
-    ├── roulette.js    # 캔버스 룰렛
-    ├── voting.js      # 투표 (시작/종료시간, 이름필수)
-    └── app.js         # UI 이벤트 + 전체 흐름
+    ├── config.js         # 앱 설정 (저장소, 프록시, 폴링 간격)
+    ├── storage.js        # localStorage 어댑터
+    ├── storage-azure.js  # Azure Table Storage 어댑터
+    ├── stores.js         # 가게 CRUD
+    ├── maps.js           # 네이버 지도 · Geocoder · 마커
+    ├── naver-api.js      # 네이버 place 페이지 파싱 (URL 빠른 등록)
+    ├── week-history.js   # 주간 당첨 기록 규칙
+    ├── roulette.js       # 캔버스 룰렛
+    ├── voting.js         # 자유 투표 (참여 인원, 시간 제한, 1인 1표)
+    └── app.js            # UI 이벤트 · 상태 · 전체 흐름
 ```
+
+## 보안 주의
+
+> [!CAUTION]
+> `js/config.js` 의 **SAS 토큰은 브라우저에 그대로 노출** 됩니다. 페이지 주소를 아는 사람은 누구나 테이블을 읽고, 쓰고, **지울 수 있습니다**.
+
+- 사내 · 지인 그룹용 **비공개 페이지** 로만 운영하세요. 공개 저장소라면 토큰이 커밋 기록에 남습니다.
+- 토큰 만료일은 짧게 잡고 주기적으로 재발급하세요. 노출이 의심되면 즉시 **Storage Account 키를 교체** 해 기존 토큰을 무효화하세요.
+- 더 안전하게 운영하려면 Azure Function 등 경량 백엔드에서 토큰을 발급 · 검증하세요.
+- 관리자 암호는 클라이언트 코드에 들어 있어 **실수 방지용** 일 뿐, 보안 장치가 아닙니다.
+- **Naver Maps Key ID** 는 도메인 인증으로 보호되므로 노출되어도 괜찮지만, **Client Secret** 은 절대 클라이언트 코드에 넣지 마세요.
+
+## 알려진 한계
+
+- **HTML 스크래핑**: URL 빠른 등록은 공식 API가 아니어서 네이버 페이지 구조가 바뀌면 깨질 수 있습니다.
+- **공개 CORS 프록시**: 느리거나 다운되거나 트래픽이 많으면 차단될 수 있습니다.
+- **동시 투표**: "최신 읽기 → 변경 → 쓰기" 방식이라 ETag 기반 낙관적 동시성이 아닙니다. 수십 ms 차이로 동시에 투표하거나 참여 인원을 바꾸면 한쪽 변경이 유실될 수 있으며, 다시 하면 됩니다.
+- **자동 룰렛**: 서버 없이 브라우저가 실행하므로 11:00 ~ 13:00 사이에 아무도 접속하지 않으면 그날 점심 룰렛은 돌지 않습니다.
 
 ## 라이선스
 
-MIT (자유 사용/수정/배포).
+[MIT](https://opensource.org/licenses/MIT) — 자유롭게 사용 · 수정 · 배포할 수 있습니다.

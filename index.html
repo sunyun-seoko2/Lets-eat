@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>밥먹자!</title>
-  <link rel="stylesheet" href="styles.css?v=23" />
+  <link rel="stylesheet" href="styles.css?v=28" />
   <script>
     // Apply saved theme immediately to prevent flash of light theme
     (function () {
@@ -25,7 +25,6 @@
       <img class="tabs-side-img left" src="assets/tabs-left.png" alt="점심 버튼 왼쪽 이미지" />
       <nav class="meal-tabs">
         <button class="meal-tab active" data-tab="lunch" type="button">🥗 점심</button>
-        <button class="meal-tab" data-tab="fridayLunch" type="button">금요일 점심</button>
         <button class="meal-tab" data-tab="dinner" type="button">🍻 저녁</button>
         <button class="meal-tab" data-tab="settings" type="button">⚙️ 설정</button>
         <button id="theme-toggle" class="theme-toggle" type="button" title="다크모드 전환" aria-label="다크모드 전환">
@@ -81,26 +80,17 @@
         <button id="btn-map-my-location" class="btn btn-secondary" type="button">📍 내 위치로 이동</button>
       </div>
       <div id="map" class="map"></div>
-      <p class="hint" id="map-hint">가게를 클릭하면 지도에서 위치를 확인할 수 있어요.</p>
-    </section>
-
-    <section class="card meal-list-card">
-      <div class="card-header">
-        <h2>가게 리스트 <span id="store-count" class="muted">(0)</span></h2>
-        <input id="store-search-main" type="text" class="store-search-input" placeholder="가게 이름 검색" />
-      </div>
-      <ul id="store-list" class="store-list"></ul>
+      <p class="walk-info hidden" id="walk-info"></p>
+      <p class="hint" id="map-hint">룰렛 결과가 나오면 당첨 가게와 회사까지의 도보 동선이 표시돼요.</p>
     </section>
 
     <section class="card roulette-card">
-      <h2>🎯 랜덤 룰렛</h2>
-      <p class="hint">랜덤 후보(최대 <strong>5개</strong>) 또는 선택 룰렛(최대 <strong>10개</strong>)으로 돌릴 수 있습니다.</p>
-      <div class="roulette-controls">
-        <button id="btn-pick-roulette" class="btn btn-secondary">🎲 랜덤 5개 뽑기</button>
-        <button id="btn-pick-roulette-selected" class="btn btn-secondary">✅ 선택 룰렛</button>
-        <button id="btn-spin" class="btn btn-primary" disabled>▶ 룰렛 돌리기</button>
-        <button id="btn-reset-roulette" class="btn btn-link" type="button">룰렛 초기화</button>
+      <div class="card-header vote-card-header">
+        <h2>🎯 랜덤 룰렛</h2>
+        <button id="btn-roulette-history" class="btn btn-secondary vote-history-btn" type="button" title="이전 룰렛 기록">🕘 이전 룰렛
+          기록</button>
       </div>
+      <p class="hint">평일 오전 11:00에 점심 메뉴 룰렛이 자동으로 돌아갑니다. 금요일 오전 11:00에 돌아가는 룰렛은 금요일 전용 가게만 포함 됩니다.</p>
       <div class="roulette-stage">
         <canvas id="roulette-canvas" width="440" height="440"></canvas>
         <div id="roulette-pointer">▼</div>
@@ -114,16 +104,24 @@
         <button id="btn-vote-history" class="btn btn-secondary vote-history-btn" type="button" title="이전 투표 기록">🕘 이전 투표
           기록</button>
       </div>
-      <p class="hint">무작위 선정(최대 15개) 또는 선택 투표(최대 15개)로 후보를 정한 뒤, 시작/종료 시간을 설정하세요.</p>
+      <p class="hint">식사와 별개인 자유 투표예요. 선호하는 LLM, 스터디 날짜, 회식 날짜 등 무엇이든 물어보세요.</p>
 
       <div class="vote-setup">
-        <div class="form-row two">
-          <label>후보 개수
-            <input type="number" id="vote-candidate-count" min="2" max="15" value="5" />
-          </label>
-          <button type="button" id="btn-pick-vote" class="btn btn-secondary vote-candidate-action">🎲 후보 무작위 선정</button>
-          <button type="button" id="btn-pick-vote-selected" class="btn btn-secondary vote-candidate-action">✅ 후보 선택
-            투표</button>
+        <label>투표 제목 *
+          <input type="text" id="vote-title" maxlength="60" placeholder="예: 가장 많이 사용하는 AI Agent는 어떤 건가요?" />
+        </label>
+        <label>설명 (선택)
+          <input type="text" id="vote-desc" maxlength="120" placeholder="예: 구독료를 지원해 주려나봐요 🎉" />
+        </label>
+        <div class="vote-subhead">
+          <span>선택지 *</span>
+          <span class="muted">2~10개</span>
+        </div>
+        <ul id="vote-option-inputs" class="vote-option-inputs"></ul>
+        <button type="button" id="btn-add-vote-option" class="btn btn-link vote-add-option">+ 선택지 추가</button>
+        <div class="vote-flags">
+          <label class="vote-check"><input type="checkbox" id="vote-multi" /> 복수 선택 허용</label>
+          <label class="vote-check"><input type="checkbox" id="vote-anonymous" /> 익명 투표</label>
         </div>
         <div class="form-row two">
           <label>투표 시작 시간
@@ -133,10 +131,10 @@
             <input type="datetime-local" id="vote-end" />
           </label>
         </div>
+        <div id="vote-setup-participants"></div>
         <div class="form-actions">
-          <button id="btn-create-vote" type="button" class="btn btn-primary" disabled>투표 생성</button>
+          <button id="btn-create-vote" type="button" class="btn btn-primary">투표 시작</button>
         </div>
-        <p class="hint">투표 대상자 선택 목록은 투표 생성 후 표시됩니다.</p>
       </div>
 
       <div id="vote-active" class="vote-active hidden">
@@ -145,17 +143,26 @@
           <span id="vote-timer" class="muted"></span>
           <button id="btn-cancel-vote" class="btn btn-link">투표 종료/삭제</button>
         </div>
-        <ul id="vote-candidates" class="vote-candidates"></ul>
-        <div class="form-row">
-          <label>투표 대상자 선택 *
+        <h3 id="vote-title-view" class="vote-title-view"></h3>
+        <p id="vote-desc-view" class="hint hidden"></p>
+        <div id="vote-winner" class="vote-winner hidden"></div>
+        <div id="vote-participants"></div>
+        <div id="vote-ballot" class="vote-ballot">
+          <label>투표자 *
             <select id="vote-voter-select">
-              <option value="">대상자를 선택하세요</option>
+              <option value="">참여 인원을 선택하세요</option>
             </select>
           </label>
+          <ul id="vote-options" class="vote-options"></ul>
+          <button id="btn-cast-vote" type="button" class="btn btn-primary">투표하기</button>
+          <p id="vote-voter-hint" class="hint"></p>
         </div>
-        <p id="vote-voter-hint" class="hint">남은 투표 가능 대상자를 선택해 투표하세요.</p>
-        <h3>투표 현황</h3>
+        <h3>투표 현황 <span id="vote-progress" class="muted"></span></h3>
         <ul id="vote-results" class="vote-results"></ul>
+        <p id="vote-not-voted" class="hint"></p>
+        <div class="form-actions">
+          <button id="btn-new-vote" type="button" class="btn btn-secondary hidden">새 투표 만들기</button>
+        </div>
       </div>
     </section>
   </main>
@@ -245,16 +252,8 @@
         네이버 지도에서 가게 페이지의 URL을 복사해 붙여넣으면 가게 이름과 좌표를 자동으로 추출합니다.
         <br />예: <code>https://map.naver.com/p/search/김밥천국/place/1194911319?c=...</code>
       </p>
+      <p class="hint" id="reg-target-hint"></p>
 
-      <div class="form-row">
-        <label>등록할 식사
-          <div class="radio-group" id="reg-meal-group">
-            <label><input type="radio" name="reg-meal" value="lunch" checked /> 🥗 점심</label>
-            <label><input type="radio" name="reg-meal" value="dinner" /> 🍻 저녁</label>
-            <label><input type="radio" name="reg-meal" value="fridayLunch" /> 📅 금요일 점심</label>
-          </div>
-        </label>
-      </div>
       <div class="form-row">
         <label>네이버 지도 URL *
           <input id="reg-url" type="url" placeholder="https://map.naver.com/p/search/.../place/..." />
@@ -314,7 +313,7 @@
         <h2>등록된 가게 <span id="settings-store-count" class="muted">(0)</span></h2>
         <input id="store-search-settings-list" type="text" class="store-search-input" placeholder="가게 이름 검색" />
       </div>
-      <p class="hint">선택한 식사 탭의 등록된 가게입니다. 좌표가 없는 가게는 “📍 지도에서 지정” 버튼으로 위치를 잡아주세요.</p>
+      <p class="hint">점심 · 금요일 점심에 등록된 모든 가게입니다. 이름 옆에 룰렛에 쓰이는 탭이 표시됩니다. 좌표가 없는 가게는 “📍 지도에서 지정” 버튼으로 위치를 잡아주세요.</p>
       <ul id="settings-store-list" class="store-list"></ul>
 
       <div id="settings-map-wrap" class="hidden">
@@ -334,16 +333,16 @@
     src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=hxjr338ho7&submodules=geocoder">
     </script>
 
-  <script src="js/config.js?v=11"></script>
-  <script src="js/storage.js?v=11"></script>
-  <script src="js/storage-azure.js?v=11"></script>
+  <script src="js/config.js?v=12"></script>
+  <script src="js/storage.js?v=12"></script>
+  <script src="js/storage-azure.js?v=12"></script>
   <script src="js/stores.js?v=9"></script>
-  <script src="js/maps.js?v=11"></script>
+  <script src="js/maps.js?v=14"></script>
   <script src="js/naver-api.js?v=9"></script>
   <script src="js/week-history.js?v=1"></script>
-  <script src="js/roulette.js?v=11"></script>
-  <script src="js/voting.js?v=10"></script>
-  <script src="js/app.js?v=23"></script>
+  <script src="js/roulette.js?v=12"></script>
+  <script src="js/voting.js?v=11"></script>
+  <script src="js/app.js?v=30"></script>
 </body>
 
 </html>

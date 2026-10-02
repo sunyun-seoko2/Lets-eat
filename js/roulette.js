@@ -1,6 +1,6 @@
 /**
  * Roulette — canvas-based spinning wheel.
- * - 기본 랜덤 후보(최대 5개) + 선택 룰렛(최대 10개)
+ * - 평일 11:00 자동 실행 (랜덤 후보 최대 5개)
  * - 외부에서 지정한 winnerId/startAt/duration으로 동기화 재생 가능
  */
 (function () {
@@ -62,7 +62,7 @@
         ctx.font = '700 16px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('“랜덤/선택 룰렛” 버튼으로 후보를 준비하세요', cx, cy);
+        ctx.fillText('오늘은 어떤 점심 메뉴를 먹게될까요?', cx, cy);
         return;
       }
 

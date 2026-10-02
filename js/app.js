@@ -7,12 +7,13 @@
   const MEAL_TYPES = ['lunch', 'dinner', 'fridayLunch'];
   const ROULETTE_DEFAULT_LEAD_MS = 2000;
   const ROULETTE_DEFAULT_DURATION_MS = 8000;
-  const ROULETTE_LOCK_MESSAGE = '오늘 룰렛은 이미 완료되었습니다. 수동 초기화하거나 다음날 09:00 자동 초기화 후 다시 돌릴 수 있습니다.';
+  const ROULETTE_AUTO_START_MINUTES = 11 * 60; // 평일 11:00 점심 룰렛 자동 실행
+  const ROULETTE_AUTO_END_MINUTES = 13 * 60;   // 13:00까지 아무도 접속하지 않았으면 그날은 건너뜀
+  const ROULETTE_HISTORY_MAX = 15;              // 이전 룰렛 기록 최대 보관 개수
 
   const state = {
     activeTab: 'lunch',           // meal tab key | 'settings'
     meal: 'lunch',                // 현재 작업 대상 식사 타입
-    selectedStoreId: null,
     voteTimer: null,
     pickingForStoreId: null,      // 좌표 지정 모드 대상
     people: [],
@@ -25,7 +26,9 @@
     randomHistoryByMeal: { lunch: [], dinner: [], fridayLunch: [] },
     rouletteByMeal: { lunch: null, dinner: null, fridayLunch: null },
     rouletteRenderedSessionId: '',
-    mainStoreSearch: '',
+    voteDraftOptions: ['', ''],   // 새 투표 선택지 입력값
+    voteDraftParticipants: null,  // null = 아직 손대지 않음(전원 참여)
+    voteSelection: [],            // 현재 투표자가 고른 선택지 id
     settingsStoreSearch: '',
   };
 
@@ -33,6 +36,7 @@
 
   async function init() {
     updateStorageStatus();
+    applyTabVisibility();
     Maps.init('map');
     Roulette.init('roulette-canvas');
 
@@ -40,8 +44,8 @@
     bindStoreForm();
     bindAutoAdd();
     bindStoreSearch();
-    bindRoulette();
     bindVoting();
+    bindRouletteHistory();
     bindPeopleAndCautions();
     bindSettingsSubtabs();
     bindRandomHistoryManager();
@@ -54,10 +58,10 @@
     // 식사 타입 데이터 미리 로드
     for (const meal of MEAL_TYPES) {
       await Stores.load(meal);
-      await Voting.load(meal);
       await loadRandomHistoryForMeal(meal);
       await loadRouletteForMeal(meal);
     }
+    await Voting.load();
     await loadPeopleData();
 
     await switchTab(getInitialMealTabBySeoulTime());
@@ -70,6 +74,7 @@
     startWeeklyHistoryResetWatcher();
     startVoteAutoResetWatcher();
     startRouletteAutoResetWatcher();
+    startRouletteAutoSpinWatcher();
     startTodayGroupTitleWatcher();
     updateTodayGroupTitle();
     renderPeopleAndAssignments();
@@ -412,7 +417,6 @@
       if (!resetDone && !pinChanged) return;
       renderPeopleAndAssignments();
       if (MEAL_TYPES.includes(state.activeTab)) {
-        renderStoreList();
         Maps.renderStores(getVisibleStores());
       }
     }, 60 * 1000);
@@ -435,7 +439,6 @@
         await window.Storage.clearVoteHistory(meal);
       }
       state.randomHistoryByMeal[meal] = [];
-      if (window.Voting && Voting.history) Voting.history[meal] = [];
     }
 
     const boundary = window.WeekHistory.getLatestPassedSaturday10Ms();
@@ -450,15 +453,8 @@
         if (!resetDone) return;
         for (const meal of MEAL_TYPES) {
           await loadRandomHistoryForMeal(meal);
-          if (window.Voting && typeof Voting.loadHistory === 'function') {
-            await Voting.loadHistory(meal);
-          }
         }
         if (state.settingsSubtab === 'history') renderRandomHistoryManager();
-        if (MEAL_TYPES.includes(state.activeTab)) {
-          renderVote();
-          renderStoreList();
-        }
       } catch (e) {
         console.warn('weekly history reset watcher failed:', e);
       }
@@ -497,6 +493,7 @@
   }
 
   function getTodayGroupTitleBySeoulTime() {
+    if (!isDinnerTabEnabled()) return '오늘 점심🍽️';
     // 사용자가 식사 탭을 직접 선택한 경우 탭 기준 문구를 우선 반영
     if (state.activeTab === 'lunch' || state.activeTab === 'fridayLunch') {
       return '오늘 점심🍽️';
@@ -554,9 +551,7 @@
       if (running) return;
       running = true;
       try {
-        for (const meal of MEAL_TYPES) {
-          await Voting.load(meal);
-        }
+        await Voting.load();
         if (MEAL_TYPES.includes(state.activeTab)) {
           renderVote();
         }
@@ -569,9 +564,9 @@
   }
 
   function schedulePoll() {
-    const v = Voting.get(state.meal);
+    const v = Voting.get();
     const voteOpen = v && Voting.status(v) === 'open';
-    const rouletteSpinning = isRouletteSpinning(state.meal);
+    const rouletteSpinning = isRouletteSpinning(getMainDisplayMeal());
     const desired = rouletteSpinning
       ? (window.AppConfig.pollIntervalRouletteMs || 1000)
       : voteOpen
@@ -593,7 +588,7 @@
         await loadRandomHistoryForMeal(meal);
         await loadRouletteForMeal(meal);
       }
-      await Voting.load(state.meal);
+      await Voting.load();
       await loadPeopleData();
     } catch (e) {
       console.warn('poll failed:', e);
@@ -603,10 +598,8 @@
     renderCautions();
     // 활성 탭 기준으로 UI 갱신
     if (MEAL_TYPES.includes(state.activeTab)) {
-      renderStoreList();
-      Maps.renderStores(getVisibleStores());
       renderVote();
-      renderRouletteFromShared();
+      renderRouletteFromShared(); // 지도 마커·동선도 함께 갱신
     } else if (state.activeTab === 'settings') {
       renderSettingsStoreList();
       if (state.settingsSubtab === 'history') renderRandomHistoryManager();
@@ -619,13 +612,6 @@
     $$('.meal-tab').forEach((btn) => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
-    // settings 안의 식사 선택 라디오
-    $$('input[name="reg-meal"]').forEach((r) => {
-      r.addEventListener('change', () => {
-        state.meal = r.value;
-        renderSettingsStoreList();
-      });
-    });
   }
 
   function bindSettingsSubtabs() {
@@ -635,14 +621,6 @@
   }
 
   function bindStoreSearch() {
-    const mainSearch = $('#store-search-main');
-    if (mainSearch) {
-      mainSearch.addEventListener('input', () => {
-        state.mainStoreSearch = (mainSearch.value || '').trim().toLowerCase();
-        renderStoreList();
-      });
-    }
-
     const syncSettingsSearch = (nextValue, sourceEl) => {
       state.settingsStoreSearch = (nextValue || '').trim().toLowerCase();
       const top = $('#store-search-settings-top');
@@ -1154,7 +1132,29 @@
     });
   }
 
+  // 저녁 탭은 config.js 의 showDinnerTab 이 true 일 때만 표시 (코드는 그대로 유지)
+  function isDinnerTabEnabled() {
+    return Boolean(window.AppConfig && window.AppConfig.showDinnerTab);
+  }
+
+  // 화면에 보이는 식사 탭 (설정 메뉴의 식사 선택지도 이 목록을 따름)
+  function getVisibleMealTypes() {
+    return MEAL_TYPES.filter((meal) => meal !== 'dinner' || isDinnerTabEnabled());
+  }
+
+  function applyTabVisibility() {
+    const dinnerBtn = $('.meal-tab[data-tab="dinner"]');
+    if (dinnerBtn) dinnerBtn.classList.toggle('hidden', !isDinnerTabEnabled());
+    const historyDinnerOption = $('#random-history-meal option[value="dinner"]');
+    if (historyDinnerOption && !isDinnerTabEnabled()) historyDinnerOption.remove();
+    const nav = $('.meal-tabs');
+    if (nav) nav.style.setProperty('--tab-count', String($$('.meal-tab:not(.hidden)').length));
+  }
+
   async function switchTab(tab) {
+    if (tab === 'dinner' && !isDinnerTabEnabled()) tab = 'lunch';
+    // 금요일 점심은 별도 탭 없이 점심 탭에서 보여줌 (금요일엔 금요일 점심 가게로 룰렛·지도 표시)
+    if (tab === 'fridayLunch') tab = 'lunch';
     cancelPickMode();
     state.activeTab = tab;
     updateTodayGroupTitle();
@@ -1163,7 +1163,7 @@
     if (tab === 'settings') {
       $('#panel-meal').classList.add('hidden');
       $('#panel-settings').classList.remove('hidden');
-      $$('input[name="reg-meal"]').forEach((r) => { r.checked = (r.value === state.meal); });
+      updateRegisterTargetHint();
       renderSettingsStoreList();
       switchSettingsSubtab(state.settingsSubtab || 'people');
       return;
@@ -1171,14 +1171,10 @@
 
     // meal tabs
     state.meal = tab;
-    state.selectedStoreId = null;
-    await Voting.load(state.meal);
     $('#panel-settings').classList.add('hidden');
     $('#panel-meal').classList.remove('hidden');
 
-    renderStoreList();
-    Maps.renderStores(getVisibleStores());
-    renderRouletteFromShared();
+    renderRouletteFromShared(); // 지도 마커·동선도 함께 갱신
     renderVote();
   }
 
@@ -1267,12 +1263,22 @@
     return { store, warnNoCoords };
   }
 
+  // 새 가게는 점심으로 등록. 금요일 점심에도 쓰려면 목록의 '중복 허용'에서 선택
+  function getRegisterMeal() {
+    return 'lunch';
+  }
+
+  function updateRegisterTargetHint() {
+    const el = $('#reg-target-hint');
+    if (el) el.textContent = '새 가게는 점심에 등록됩니다. 금요일 점심에도 쓰려면 아래 목록의 "중복 허용"에서 선택하세요.';
+  }
+
   // ---------- Settings: Auto-add (URL 폼) ----------
   function bindAutoAdd() {
     $('#btn-auto-add').addEventListener('click', async () => {
       const url = $('#reg-url').value.trim();
       const memo = $('#reg-memo').value.trim();
-      const meal = ($$('input[name="reg-meal"]').find((r) => r.checked) || {}).value || 'lunch';
+      const meal = getRegisterMeal();
       const statusEl = $('#auto-add-status');
 
       const setStatus = (kind, msg) => {
@@ -1290,15 +1296,8 @@
 
       $('#reg-url').value = '';
       $('#reg-memo').value = '';
-      state.meal = meal;
-      $$('input[name="reg-meal"]').forEach((r) => { r.checked = (r.value === meal); });
       renderSettingsStoreList();
-      // 현재 선택한 식사 탭이 활성이라면 지도/리스트도 즉시 갱신
-      if (state.activeTab === meal) {
-        renderStoreList();
-        Maps.renderStores(getVisibleStores());
-      }
-      if (result.warnNoCoords) beginPickMode(result.store.id);
+      if (result.warnNoCoords) beginPickMode(result.store.id, meal);
     });
   }
 
@@ -1311,6 +1310,7 @@
       try {
         await Maps.reload('map');
         Maps.renderStores(getVisibleStores());
+        updateWalkRoute();
         const loc = await Maps.moveToFixedLocation();
         if (!loc) return;
         const hint = $('#map-hint');
@@ -1328,7 +1328,7 @@
   function bindStoreForm() {
     $('#store-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const meal = $$('input[name="reg-meal"]').find((r) => r.checked).value;
+      const meal = getRegisterMeal();
       const name = $('#store-name').value.trim();
       if (!name) return;
 
@@ -1358,8 +1358,6 @@
         return;
       }
       $('#store-form').reset();
-      state.meal = meal;
-      $$('input[name="reg-meal"]').forEach((r) => { r.checked = (r.value === meal); });
       renderSettingsStoreList();
     });
 
@@ -1384,7 +1382,7 @@
   // ---------- Settings: Store list + pick mode ----------
   function renderSettingsStoreList() {
     const list = $('#settings-store-list');
-    let stores = getVisibleStoresForMeal(state.meal, { includeMeta: true });
+    let stores = getSettingsStores();
     const q = state.settingsStoreSearch || '';
     if (q) {
       stores = stores.filter((s) => String(s.name || '').toLowerCase().includes(q));
@@ -1397,14 +1395,15 @@
     }
     stores.forEach((s) => {
       const li = document.createElement('li');
-      const sourceMeal = s.__sourceMeal || state.meal;
-      const mirrored = Boolean(s.__isMirrored);
+      const sourceMeal = s.__sourceMeal;
+      const mirrored = false;
       const noCoords = (s.lat == null || s.lng == null);
+      const shownMeals = getStoreVisibleMeals(s, sourceMeal).filter((m) => getVisibleMealTypes().includes(m));
       li.innerHTML = `
         <div>
           <div class="s-name">${escapeHtml(s.name)}
             ${noCoords ? '<span class="s-badge warn">좌표 미확인</span>' : ''}
-            ${mirrored ? `<span class="s-badge">중복표시·원본:${mealLabel(sourceMeal)}</span>` : ''}
+            <span class="s-badge">${escapeHtml(shownMeals.length ? shownMeals.map(mealLabel).join(' · ') : '노출 탭 없음')}</span>
           </div>
           <div class="s-meta">
             ${buildStoreMetaHtml(s, true)}
@@ -1435,8 +1434,7 @@
           if (edited === null) return;
           await Stores.update(sourceMeal, s.id, { memo: edited });
           renderSettingsStoreList();
-          if (MEAL_TYPES.includes(state.activeTab) && state.activeTab === state.meal) {
-            renderStoreList();
+          if (MEAL_TYPES.includes(state.activeTab)) {
             Maps.renderStores(getVisibleStores());
           }
           return;
@@ -1449,10 +1447,17 @@
           await openStoreCautionTagsMenu(s, sourceMeal);
           return;
         }
-        if (action === 'pick') { beginPickMode(s.id); return; }
+        if (action === 'pick') { beginPickMode(s.id, sourceMeal); return; }
       });
       list.appendChild(li);
     });
+  }
+
+  // 설정 목록: 보이는 식사 탭(점심 / 금요일 점심)에 등록된 원본 가게 전체
+  function getSettingsStores() {
+    return getVisibleMealTypes().flatMap((meal) =>
+      Stores.get(meal).map((store) => ({ ...store, __sourceMeal: meal, __isMirrored: false }))
+    );
   }
 
   let settingsMap = null;
@@ -1470,7 +1475,7 @@
     if (!settingsMap) return;
     settingsMarkers.forEach((m) => m.setMap(null));
     settingsMarkers = [];
-    const stores = getVisibleStoresForMeal(state.meal, { includeMeta: false });
+    const stores = getSettingsStores();
     const bounds = new naver.maps.LatLngBounds();
     let count = 0;
     stores.forEach((s) => {
@@ -1489,10 +1494,11 @@
     }
   }
 
-  function beginPickMode(storeId) {
-    const store = Stores.getById(state.meal, storeId);
+  function beginPickMode(storeId, meal = 'lunch') {
+    const store = Stores.getById(meal, storeId);
     if (!store) return;
     state.pickingForStoreId = storeId;
+    state.pickingForMeal = meal;
     $('#settings-map-wrap').classList.remove('hidden');
     $('#pick-mode-hint').textContent =
       `"${store.name}" 의 위치를 지도에서 클릭해주세요. (ESC로 취소)`;
@@ -1511,12 +1517,13 @@
       const lng = e.coord.lng();
       const sid = state.pickingForStoreId;
       if (!sid) return;
-      const stores = Stores.get(state.meal);
+      const pickMeal = state.pickingForMeal || 'lunch';
+      const stores = Stores.get(pickMeal);
       const idx = stores.findIndex((x) => x.id === sid);
       if (idx >= 0) {
         stores[idx].lat = lat;
         stores[idx].lng = lng;
-        await Storage.saveStores(state.meal, stores);
+        await Storage.saveStores(pickMeal, stores);
       }
       cancelPickMode();
       renderSettingsStoreList();
@@ -1541,174 +1548,7 @@
     state.pickingForStoreId = null;
   }
 
-  // ---------- Meal panel: Store list (read-only) ----------
-  function renderStoreList() {
-    const list = $('#store-list');
-    let stores = getVisibleStores();
-    const q = state.mainStoreSearch || '';
-    if (q) {
-      stores = stores.filter((s) => String(s.name || '').toLowerCase().includes(q));
-    }
-    $('#store-count').textContent = `(${stores.length})`;
-    list.innerHTML = '';
-    if (stores.length === 0) {
-      list.innerHTML = '<li style="border:none;background:transparent;color:#888;justify-content:center">등록된 가게가 없습니다. 설정에서 추가해주세요.</li>';
-      return;
-    }
-    stores.forEach((s) => {
-      const li = document.createElement('li');
-      li.dataset.id = s.id;
-      if (state.selectedStoreId === s.id) li.classList.add('selected');
-      const noCoords = (s.lat == null || s.lng == null);
-      li.innerHTML = `
-        <div>
-          <div class="s-name">${escapeHtml(s.name)}
-            ${noCoords ? '<span class="s-badge warn">좌표 미확인</span>' : ''}
-          </div>
-          <div class="s-meta">
-            ${buildStoreMetaHtml(s, false)}
-          </div>
-        </div>
-        <div class="s-actions">
-          ${s.url ? `<button data-action="open">🔗</button>` : ''}
-        </div>
-      `;
-      li.addEventListener('click', (e) => {
-        const action = e.target.dataset && e.target.dataset.action;
-        if (action === 'open') { window.open(s.url, '_blank', 'noopener'); return; }
-        state.selectedStoreId = s.id;
-        renderStoreList();
-        Maps.focus(s);
-      });
-      list.appendChild(li);
-    });
-  }
-
   // ---------- Roulette ----------
-  function bindRoulette() {
-    $('#btn-pick-roulette').addEventListener('click', async () => {
-      try {
-        await maybeAutoResetRouletteForMeal(state.meal);
-        if (isRouletteResultLocked(state.rouletteByMeal[state.meal])) {
-          await showAppAlert('룰렛 이용 제한', ROULETTE_LOCK_MESSAGE);
-          renderRouletteFromShared();
-          return;
-        }
-        const picks = await pickRandomFromVisible(5);
-        if (picks.length < 2) {
-          await showAppAlert('룰렛 후보 부족', '이번 주(월~금) 제외 기록으로 인해 후보가 부족합니다. 설정 > 기록 관리에서 삭제하거나 가게를 추가해주세요.');
-          return;
-        }
-        await saveRouletteForMeal(state.meal, buildRouletteSession(picks, 'random'));
-        renderRouletteFromShared();
-      } catch (e) {
-        console.warn('roulette pick failed:', e);
-        await showAppAlert('룰렛 후보 선정', '후보 선정 중 오류가 발생했습니다.');
-      }
-    });
-
-    const selectedBtn = $('#btn-pick-roulette-selected');
-    if (selectedBtn) {
-      selectedBtn.addEventListener('click', async () => {
-        await maybeAutoResetRouletteForMeal(state.meal);
-        if (isRouletteResultLocked(state.rouletteByMeal[state.meal])) {
-          await showAppAlert('룰렛 이용 제한', ROULETTE_LOCK_MESSAGE);
-          renderRouletteFromShared();
-          return;
-        }
-        const selected = await openStorePickerModal({
-          title: '선택 룰렛',
-          subtitle: '룰렛에 넣을 가게를 선택하세요. (최소 2개, 최대 10개)',
-          saveLabel: '룰렛 준비',
-          minSelect: 2,
-          maxSelect: 10,
-          filterFn: (s) => !isBlockedByCaution(s),
-        });
-        if (!selected || !selected.length) return;
-        await saveRouletteForMeal(state.meal, buildRouletteSession(selected, 'selected'));
-        renderRouletteFromShared();
-      });
-    }
-
-    $('#btn-spin').addEventListener('click', async () => {
-      await maybeAutoResetRouletteForMeal(state.meal);
-      const current = state.rouletteByMeal[state.meal];
-      if (isRouletteResultLocked(current)) {
-        await showAppAlert('룰렛 이용 제한', ROULETTE_LOCK_MESSAGE);
-        renderRouletteFromShared();
-        return;
-      }
-      const items = current && Array.isArray(current.items) ? current.items : [];
-      if (items.length < 2) {
-        await showAppAlert('룰렛 돌리기', '먼저 룰렛 후보를 준비해주세요.');
-        return;
-      }
-      const winner = items[Math.floor(Math.random() * items.length)];
-      const spinId = `rspin_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-      const next = {
-        ...current,
-        id: spinId,
-        status: 'spinning',
-        winnerId: winner.id,
-        winnerName: winner.name,
-        spunAt: Date.now(),
-        startAt: Date.now() + getRouletteSpinLeadMs(),
-        durationMs: getRouletteSpinDurationMs(),
-        spinTurns: getRouletteSpinTurns(),
-        startRotation: 0,
-        updatedAt: Date.now(),
-      };
-      $('#btn-spin').disabled = true;
-      $('#roulette-result').textContent = '룰렛이 곧 시작됩니다…';
-      $('#roulette-result').classList.remove('winner');
-      await saveRouletteForMeal(state.meal, next);
-      await appendRandomWinnerHistory(state.meal, winner, 'rouletteWinner', `roulette:${spinId}`);
-      renderRouletteFromShared();
-      schedulePoll();
-    });
-
-    const resetBtn = $('#btn-reset-roulette');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', async () => {
-        const session = state.rouletteByMeal[state.meal];
-        if (!session || !Array.isArray(session.items) || !session.items.length) {
-          await showAppAlert('룰렛 초기화', '초기화할 룰렛 결과가 없습니다.');
-          return;
-        }
-        if (!(await verifyAdminPassword(
-          '룰렛 초기화',
-          '관리자가 지정한 암호로만 룰렛 결과를 초기화할 수 있습니다.'
-        ))) return;
-        if (!(await confirmAppDialog(
-          '🧺 룰렛 초기화',
-          '룰렛 후보와 결과를 초기화할까요?',
-          { confirmText: '초기화', className: 'vote-delete-confirm-modal' }
-        ))) return;
-        await saveRouletteForMeal(state.meal, null);
-        state.rouletteRenderedSessionId = '';
-        renderRouletteFromShared();
-      });
-    }
-  }
-
-  function buildRouletteSession(items, mode) {
-    const unique = dedupeStoresByUrl(items);
-    return {
-      id: `rset_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-      meal: state.meal,
-      mode: mode || 'random',
-      status: 'ready',
-      items: unique.map((it) => ({ id: it.id, name: it.name })),
-      winnerId: '',
-      winnerName: '',
-      startAt: 0,
-      durationMs: getRouletteSpinDurationMs(),
-      spinTurns: 0,
-      startRotation: 0,
-      updatedAt: Date.now(),
-    };
-  }
-
   function isRouletteSpinning(meal) {
     const session = state.rouletteByMeal[meal];
     if (!session || session.status !== 'spinning') return false;
@@ -1746,60 +1586,76 @@
   }
 
   function renderRouletteFromShared() {
+    renderRouletteWheel();
+    updateWalkRoute();
+  }
+
+  // 룰렛 결과가 확정되면 지도에 회사 → 당첨 가게 도보 동선 표시 (돌아가는 중에는 숨김)
+  function updateWalkRoute() {
+    const infoEl = $('#walk-info');
+    const store = MEAL_TYPES.includes(state.activeTab) ? getSettledWinnerStore() : null;
+    const settled = Boolean(store);
+    // 당첨 가게 마커를 먼저 그린 뒤 동선을 그려야 말풍선을 열 수 있음
+    Maps.renderStores(store ? [store] : []);
+    const estimate = store ? Maps.showWalkRoute(store) : (Maps.clearWalkRoute(), null);
+    if (!infoEl) return;
+    if (!settled) {
+      infoEl.textContent = '';
+      infoEl.classList.add('hidden');
+      return;
+    }
+    infoEl.classList.remove('hidden');
+    const name = store.name || '';
+    infoEl.textContent = estimate
+      ? `🚶 회사 → ${name} · 도보 약 ${estimate.minutes}분 (약 ${Maps.formatMeters(estimate.walkM)}, 직선 ${Maps.formatMeters(estimate.straightM)})`
+      : `🚶 ${name}: 좌표가 없어 동선을 표시할 수 없어요. 설정에서 가게 위치를 지정해주세요.`;
+  }
+
+  function renderRouletteWheel() {
     const resultEl = $('#roulette-result');
-    const spinBtn = $('#btn-spin');
-    if (!resultEl || !spinBtn) return;
-    const session = state.rouletteByMeal[state.meal];
+    if (!resultEl) return;
+    const session = state.rouletteByMeal[getMainDisplayMeal()];
     if (!session || !Array.isArray(session.items) || session.items.length < 2) {
       Roulette.setItems([]);
-      setRouletteSetupButtonsDisabled(false);
-      resultEl.textContent = '';
+      const todayNote = session && session.autoRunDate === getSeoulDateTimeParts().dateKey && session.autoNote;
+      resultEl.textContent = todayNote || '';
       resultEl.classList.remove('winner');
-      spinBtn.disabled = true;
       state.rouletteRenderedSessionId = '';
       return;
     }
     const itemSignature = Roulette.getItemsSignature(session.items);
     const currentSignature = Roulette.getItemsSignature();
     const itemsChanged = itemSignature !== currentSignature;
-    if (session.status === 'spinning' && session.winnerId) {
-      setRouletteSetupButtonsDisabled(true);
-      if (itemsChanged) Roulette.setItems(session.items);
-      const startAt = Number(session.startAt || 0);
-      const duration = Number(session.durationMs || getRouletteSpinDurationMs());
-      const endAt = startAt + duration;
-      const sessionId = String(session.id || `${session.winnerId}:${startAt}:${duration}`);
-      const playKey = `playing:${sessionId}`;
-      const settledKey = `settled:${sessionId}`;
-      spinBtn.disabled = true;
-      if (Date.now() >= endAt) {
-        const winner = Roulette.settle(session);
-        showRouletteWinner(winner || Roulette.resolveWinner(session), session);
-        spinBtn.disabled = isRouletteResultLocked(session);
-        state.rouletteRenderedSessionId = settledKey;
-        return;
-      }
-      resultEl.textContent = Date.now() < startAt ? '룰렛이 곧 시작됩니다…' : '룰렛이 돌아가고 있습니다…';
+    if (itemsChanged) Roulette.setItems(session.items);
+    if (!session.winnerId) {
+      resultEl.textContent = '';
       resultEl.classList.remove('winner');
-      if (state.rouletteRenderedSessionId !== playKey || !Roulette.spinning || itemsChanged) {
-        state.rouletteRenderedSessionId = playKey;
-        Roulette.play(session, (winner) => {
-          showRouletteWinner(winner || Roulette.resolveWinner(session), session);
-          spinBtn.disabled = isRouletteResultLocked(session);
-          state.rouletteRenderedSessionId = settledKey;
-          schedulePoll();
-        });
-      }
+      state.rouletteRenderedSessionId = '';
       return;
     }
-    setRouletteSetupButtonsDisabled(false);
-    Roulette.setItems(session.items);
+    const startAt = Number(session.startAt || 0);
+    const duration = Number(session.durationMs || getRouletteSpinDurationMs());
+    const endAt = startAt + duration;
+    const sessionId = String(session.id || `${session.winnerId}:${startAt}:${duration}`);
+    const playKey = `playing:${sessionId}`;
+    const settledKey = `settled:${sessionId}`;
+    if (Date.now() >= endAt) {
+      const winner = Roulette.settle(session);
+      showRouletteWinner(winner || Roulette.resolveWinner(session), session);
+      state.rouletteRenderedSessionId = settledKey;
+      return;
+    }
+    resultEl.textContent = Date.now() < startAt ? '룰렛이 곧 시작됩니다…' : '룰렛이 돌아가고 있습니다…';
     resultEl.classList.remove('winner');
-    resultEl.textContent = session.mode === 'selected'
-      ? `선택 룰렛 후보 ${session.items.length}곳을 준비했습니다.`
-      : `후보 ${session.items.length}곳을 무작위로 선정했습니다.`;
-    spinBtn.disabled = false;
-    state.rouletteRenderedSessionId = '';
+    if (state.rouletteRenderedSessionId !== playKey || !Roulette.spinning || itemsChanged) {
+      state.rouletteRenderedSessionId = playKey;
+      Roulette.play(session, (winner) => {
+        showRouletteWinner(winner || Roulette.resolveWinner(session), session);
+        state.rouletteRenderedSessionId = settledKey;
+        updateWalkRoute();
+        schedulePoll();
+      });
+    }
   }
 
   function showRouletteWinner(winner, session) {
@@ -1820,26 +1676,9 @@
     return getPositiveConfigNumber('rouletteSpinDurationMs', ROULETTE_DEFAULT_DURATION_MS);
   }
 
-  function getRouletteSpinTurns() {
-    return 5 + Math.floor(Math.random() * 3);
-  }
-
   function getPositiveConfigNumber(key, fallback) {
     const value = Number(window.AppConfig && window.AppConfig[key]);
     return Number.isFinite(value) && value > 0 ? value : fallback;
-  }
-
-  function setRouletteSetupButtonsDisabled(disabled) {
-    const pickBtn = $('#btn-pick-roulette');
-    const selectedBtn = $('#btn-pick-roulette-selected');
-    if (pickBtn) pickBtn.disabled = Boolean(disabled);
-    if (selectedBtn) selectedBtn.disabled = Boolean(disabled);
-  }
-
-  function isRouletteResultLocked(session) {
-    if (!session || !session.winnerId) return false;
-    const resetAt = getRouletteAutoResetAtMs(session);
-    return !resetAt || Date.now() < resetAt;
   }
 
   function shouldAutoResetRoulette(session) {
@@ -1852,7 +1691,7 @@
     const session = state.rouletteByMeal[meal];
     if (!shouldAutoResetRoulette(session)) return false;
     await saveRouletteForMeal(meal, null);
-    if (meal === state.meal) state.rouletteRenderedSessionId = '';
+    if (meal === getMainDisplayMeal()) state.rouletteRenderedSessionId = '';
     return true;
   }
 
@@ -1898,271 +1737,605 @@
     }, 60 * 1000);
   }
 
+  // ---------- 평일 11:00 점심 룰렛 자동 실행 ----------
+  // 월~목은 '점심', 금요일은 '금요일 점심' 탭의 룰렛을 돌림
+  function getAutoRouletteMealToday(parts = getSeoulDateTimeParts()) {
+    if (['Mon', 'Tue', 'Wed', 'Thu'].includes(parts.weekday)) return 'lunch';
+    if (parts.weekday === 'Fri') return 'fridayLunch';
+    return null;
+  }
 
-  // ---------- Voting ----------
-  function bindVoting() {
-    const now = new Date();
-    const later = new Date(now.getTime() + 30 * 60 * 1000);
-    $('#vote-start').value = toLocalDtInput(now);
-    $('#vote-end').value = toLocalDtInput(later);
+  function hasAutoRouletteRunToday(session, todayKey) {
+    if (!session) return false;
+    if (session.autoRunDate === todayKey) return true;
+    const spunTs = Number(session.spunAt || session.startAt || 0);
+    return Boolean(session.winnerId && spunTs
+      && getSeoulDateTimeParts(new Date(spunTs)).dateKey === todayKey);
+  }
 
-    $('#btn-pick-vote').addEventListener('click', async () => {
-      const count = Math.max(2, Math.min(15, parseInt($('#vote-candidate-count').value, 10) || 5));
+  // 같은 시드면 모든 브라우저가 같은 후보·당첨을 계산하므로 동시에 실행돼도 결과가 같음
+  function createSeededRandom(seedText) {
+    let h = 1779033703 ^ seedText.length;
+    for (let i = 0; i < seedText.length; i += 1) {
+      h = Math.imul(h ^ seedText.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    let a = h >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let autoRouletteBusy = false;
+  let autoRouletteRetryAt = 0;
+
+  async function maybeRunAutoRoulette() {
+    const parts = getSeoulDateTimeParts();
+    const meal = getAutoRouletteMealToday(parts);
+    if (!meal) return;
+    const minutes = parts.hour * 60 + parts.minute;
+    if (minutes < ROULETTE_AUTO_START_MINUTES || minutes >= ROULETTE_AUTO_END_MINUTES) return;
+    const todayKey = parts.dateKey;
+    if (hasAutoRouletteRunToday(state.rouletteByMeal[meal], todayKey)) return;
+    if (autoRouletteBusy || Date.now() < autoRouletteRetryAt) return;
+
+    autoRouletteBusy = true;
+    try {
+      await loadRouletteForMeal(meal);
+      const current = state.rouletteByMeal[meal];
+      if (hasAutoRouletteRunToday(current, todayKey)) return;
+
+      const items = (await pickRandomFromVisible(5, meal, createSeededRandom(`${todayKey}:${meal}:pick`)))
+        .map((s) => ({ id: s.id, name: s.name }));
+
+      if (items.length < 2) {
+        await saveRouletteForMeal(meal, {
+          status: 'cleared',
+          items: [],
+          autoRunDate: todayKey,
+          autoNote: '11:00 자동 룰렛: 후보가 부족해 돌리지 못했습니다. 가게를 추가하거나 설정 > 기록 관리를 확인해주세요.',
+          updatedAt: Date.now(),
+        });
+      } else {
+        const random = createSeededRandom(`${todayKey}:${meal}:${items.map((it) => it.id).join(',')}`);
+        const winner = items[Math.floor(random() * items.length)];
+        const now = Date.now();
+        const id = `rauto_${meal}_${todayKey}`;
+        const session = {
+          id,
+          meal,
+          mode: 'random',
+          status: 'spinning',
+          auto: true,
+          autoRunDate: todayKey,
+          items,
+          winnerId: winner.id,
+          winnerName: winner.name,
+          spunAt: now,
+          // 5초 단위로 맞춰 거의 동시에 실행한 브라우저끼리 시작 시각이 같도록 함
+          startAt: Math.ceil(now / 5000) * 5000 + getRouletteSpinLeadMs(),
+          durationMs: getRouletteSpinDurationMs(),
+          spinTurns: 5 + Math.floor(random() * 3),
+          startRotation: 0,
+          updatedAt: now,
+        };
+        await saveRouletteForMeal(meal, session);
+        await appendRandomWinnerHistory(meal, winner, 'rouletteWinner', `roulette:${id}`, `rh_${id}`);
+        await saveRouletteHistoryRecord({
+          id,
+          meal,
+          spunAt: session.startAt,
+          winnerId: winner.id,
+          winnerName: winner.name,
+          candidates: items.map((it) => it.name),
+          onTime: minutes === ROULETTE_AUTO_START_MINUTES,
+          outsideCount: (state.assignments.outside || []).length,
+        });
+      }
+      if (meal === getMainDisplayMeal() && MEAL_TYPES.includes(state.activeTab)) renderRouletteFromShared();
+      schedulePoll();
+    } catch (e) {
+      console.warn('auto roulette failed:', e);
+      autoRouletteRetryAt = Date.now() + 30 * 1000;
+    } finally {
+      autoRouletteBusy = false;
+    }
+  }
+
+  // ---------- 이전 룰렛 기록 ----------
+  async function saveRouletteHistoryRecord(record) {
+    if (!window.Storage || typeof window.Storage.saveRouletteHistory !== 'function') return;
+    try {
+      await window.Storage.saveRouletteHistory(record);
+      // 최근 ROULETTE_HISTORY_MAX 개만 남기고 오래된 기록 삭제
+      const rows = await window.Storage.getRouletteHistory();
+      const old = [...rows]
+        .sort((a, b) => (b.spunAt || 0) - (a.spunAt || 0))
+        .slice(ROULETTE_HISTORY_MAX);
+      for (const row of old) {
+        await window.Storage.deleteRouletteHistory(row.id);
+      }
+    } catch (e) {
+      console.warn('save roulette history failed:', e);
+    }
+  }
+
+  function bindRouletteHistory() {
+    const btn = $('#btn-roulette-history');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      let rows = [];
       try {
-        const picks = await pickRandomFromVisible(count);
-        if (picks.length < 2) {
-          await showAppAlert('투표 후보 부족', '이번 주(월~금) 제외 기록으로 인해 후보가 부족합니다. 설정 > 기록 관리에서 삭제하거나 가게를 추가해주세요.');
-          return;
-        }
-        renderVotePreview(picks);
+        rows = window.Storage && typeof window.Storage.getRouletteHistory === 'function'
+          ? await window.Storage.getRouletteHistory()
+          : [];
       } catch (e) {
-        console.warn('vote candidate pick failed:', e);
-        await showAppAlert('투표 후보 선정', '후보 선정 중 오류가 발생했습니다.');
+        console.warn('get roulette history failed:', e);
+      }
+      openRouletteHistoryModal(rows);
+    });
+  }
+
+  function openRouletteHistoryModal(records) {
+    const rows = [...(Array.isArray(records) ? records : [])]
+      .sort((a, b) => (b.spunAt || 0) - (a.spunAt || 0))
+      .slice(0, ROULETTE_HISTORY_MAX);
+    const backdrop = document.createElement('div');
+    backdrop.className = 'visibility-modal-backdrop';
+    const itemsHtml = rows.length
+      ? rows.map((row, idx) => {
+        const no = rows.length - idx;
+        const runText = row.onTime ? '11:00 정시 실행' : '늦은 실행 (11:00 이후 첫 접속)';
+        const candidates = Array.isArray(row.candidates) ? row.candidates : [];
+        const meta = [mealLabel(row.meal), runText];
+        if (Number.isFinite(row.outsideCount)) meta.push(`외식 ${row.outsideCount}명`);
+        return `
+          <li>
+            <div class="vote-history-title">No.${no} · ${escapeHtml(formatSeoulDateTimeWithWeekday(row.spunAt))}</div>
+            <div><strong>당첨:</strong> ${escapeHtml(row.winnerName || '-')}</div>
+            <div class="vote-history-meta">${escapeHtml(meta.join(' · '))}</div>
+            ${candidates.length ? `<div class="vote-history-meta">후보 ${candidates.length}곳: ${escapeHtml(candidates.join(', '))}</div>` : ''}
+          </li>
+        `;
+      }).join('')
+      : '<li><div class="vote-history-meta">기록된 이전 룰렛이 없습니다.</div></li>';
+    backdrop.innerHTML = `
+      <div class="visibility-modal vote-history-modal" role="dialog" aria-modal="true">
+        <div class="vote-history-modal-head">
+          <h3 class="vote-history-modal-title">🕘 이전 룰렛 기록</h3>
+          <button type="button" class="btn btn-link vote-history-delete-btn" data-action="clear-history" ${rows.length ? '' : 'disabled'}>기록 삭제</button>
+        </div>
+        <p class="muted">자동 룰렛 결과를 최근 ${ROULETTE_HISTORY_MAX}개까지 보관합니다.</p>
+        <ul class="vote-history-list">${itemsHtml}</ul>
+        <div class="actions">
+          <button type="button" data-action="close">닫기</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) close();
+    });
+    backdrop.querySelector('[data-action="close"]').addEventListener('click', close);
+    backdrop.querySelector('[data-action="clear-history"]').addEventListener('click', async () => {
+      if (!rows.length) return;
+      if (!(await verifyAdminPassword(
+        '이전 룰렛 기록 삭제',
+        '관리자가 지정한 암호로만 이전 룰렛 기록을 삭제할 수 있습니다.'
+      ))) return;
+      if (!(await confirmAppDialog(
+        '이전 룰렛 기록 삭제',
+        '이전 룰렛 기록을 모두 삭제할까요?',
+        { confirmText: '삭제' }
+      ))) return;
+      try {
+        await window.Storage.clearRouletteHistory();
+        close();
+        openRouletteHistoryModal([]);
+      } catch (e) {
+        console.warn('clear roulette history failed:', e);
+        await showAppAlert('이전 룰렛 기록 삭제', e.message || '기록 삭제에 실패했습니다.');
       }
     });
+  }
 
-    const voteSelectedBtn = $('#btn-pick-vote-selected');
-    if (voteSelectedBtn) {
-      voteSelectedBtn.addEventListener('click', async () => {
-        const selected = await openStorePickerModal({
-          title: '후보 선택 투표',
-          subtitle: '투표 후보로 넣을 가게를 선택하세요. (최소 2개, 최대 15개)',
-          saveLabel: '후보 확정',
-          minSelect: 2,
-          maxSelect: 15,
-          filterFn: (s) => !isBlockedByCaution(s),
-        });
-        if (!selected || !selected.length) return;
-        renderVotePreview(selected);
-      });
-    }
+  function formatSeoulDateTimeWithWeekday(ts) {
+    if (!ts) return '-';
+    const weekday = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', weekday: 'short' }).format(new Date(ts));
+    const text = formatSeoulDateTime(ts);
+    // "2026. 10. 02. 11:00" → "2026. 10. 02.(금) 11:00"
+    return text.replace(/(\d{2}\.)\s(\d{2}:\d{2})$/, `$1(${weekday}) $2`);
+  }
+
+  function startRouletteAutoSpinWatcher() {
+    maybeRunAutoRoulette();
+    setInterval(maybeRunAutoRoulette, 1000);
+  }
+
+
+  // ---------- Voting (식사와 무관한 자유 투표) ----------
+  function bindVoting() {
+    resetVoteDraftTimes();
+    renderVoteOptionInputs();
+
+    $('#btn-add-vote-option').addEventListener('click', () => {
+      if (state.voteDraftOptions.length >= Voting.MAX_OPTIONS) return;
+      state.voteDraftOptions.push('');
+      renderVoteOptionInputs();
+      const inputs = $$('#vote-option-inputs input');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
 
     $('#btn-create-vote').addEventListener('click', async () => {
-      if ($('#btn-create-vote').disabled) return;
-      const startAt = new Date($('#vote-start').value).getTime();
-      const endAt = new Date($('#vote-end').value).getTime();
-      const candidates = window.__pendingVoteCandidates;
-      const voters = state.people.map((p) => p.name);
-      if (!candidates || candidates.length < 2) {
-        await showAppAlert('투표 생성', '먼저 "후보 무작위 선정" 또는 "후보 선택 투표"로 후보를 준비해주세요.');
-        return;
-      }
-      if (!voters.length) {
-        await showAppAlert('투표 생성', '투표 대상자(위대한 명단)가 없습니다. 설정에서 대상자를 먼저 추가해주세요.');
+      try {
+        const vote = await Voting.create({
+          title: $('#vote-title').value,
+          description: $('#vote-desc').value,
+          options: state.voteDraftOptions,
+          multi: $('#vote-multi').checked,
+          anonymous: $('#vote-anonymous').checked,
+          participants: getVoteDraftParticipants(),
+          startAt: new Date($('#vote-start').value).getTime(),
+          endAt: new Date($('#vote-end').value).getTime(),
+        });
+        resetVoteDraft();
+        Voting.current = vote;
+        renderVote();
+        schedulePoll();
+      } catch (e) { await showAppAlert('투표 만들기', e.message || '투표 생성 중 오류가 발생했습니다.'); }
+    });
+
+    $('#vote-voter-select').addEventListener('change', () => {
+      const vote = Voting.get();
+      const name = $('#vote-voter-select').value;
+      const prev = vote && vote.ballots && vote.ballots[name];
+      state.voteSelection = Array.isArray(prev) ? [...prev] : [];
+      renderVote();
+    });
+
+    $('#btn-cast-vote').addEventListener('click', async () => {
+      const name = String($('#vote-voter-select').value || '').trim();
+      if (!name) {
+        await showAppAlert('투표하기', '투표자를 먼저 선택해주세요.');
+        $('#vote-voter-select').focus();
         return;
       }
       try {
-        const vote = await Voting.create(state.meal, candidates, startAt, endAt, voters);
-        window.__pendingVoteCandidates = null;
-        setVoteCreateEnabled(false);
-        Voting.current[state.meal] = vote;
+        await Voting.cast(name, state.voteSelection);
         renderVote();
-      } catch (e) { await showAppAlert('투표 생성', e.message || '투표 생성 중 오류가 발생했습니다.'); }
+      } catch (e) { await showAppAlert('투표하기', e.message || '투표 중 오류가 발생했습니다.'); }
     });
 
     $('#btn-cancel-vote').addEventListener('click', async () => {
       if (!(await verifyVoteDeletePassword())) return;
       if (!(await confirmAppDialog(
         '🧺 투표 종료/삭제',
-        '현재 투표를 종료/삭제할까요?',
+        '현재 투표를 종료하고 기록으로 보관할까요?',
         { confirmText: '정리하기', className: 'vote-delete-confirm-modal' }
       ))) return;
-      await Voting.clear(state.meal);
+      await Voting.clear('manual');
+      resetVoteDraft();
+      renderVote();
+    });
+
+    $('#btn-new-vote').addEventListener('click', async () => {
+      if (!(await confirmAppDialog(
+        '새 투표 만들기',
+        '종료된 투표를 기록으로 보관하고 새 투표를 만들까요?',
+        { confirmText: '새 투표' }
+      ))) return;
+      await Voting.clear('ended');
+      resetVoteDraft();
       renderVote();
     });
 
     const historyBtn = $('#btn-vote-history');
     if (historyBtn) {
       historyBtn.addEventListener('click', async () => {
-        await Voting.loadHistory(state.meal);
-        openVoteHistoryModal(state.meal);
+        await Voting.loadHistory();
+        openVoteHistoryModal();
       });
     }
   }
 
-  function renderVotePreview(picks) {
-    const unique = dedupeStoresByUrl(picks);
-    window.__pendingVoteCandidates = unique.map((s) => ({ id: s.id, name: s.name }));
-    setVoteCreateEnabled(true);
-    const ul = $('#vote-candidates');
+  function resetVoteDraftTimes() {
+    const now = new Date();
+    $('#vote-start').value = toLocalDtInput(now);
+    $('#vote-end').value = toLocalDtInput(new Date(now.getTime() + 30 * 60 * 1000));
+  }
+
+  function resetVoteDraft() {
+    state.voteDraftOptions = ['', ''];
+    state.voteDraftParticipants = null;
+    state.voteSelection = [];
+    $('#vote-title').value = '';
+    $('#vote-desc').value = '';
+    $('#vote-multi').checked = false;
+    $('#vote-anonymous').checked = false;
+    resetVoteDraftTimes();
+    renderVoteOptionInputs();
+  }
+
+  // 폴링 때마다 다시 그리면 입력 중인 내용이 사라지므로, 선택지 입력란은 추가/삭제 시에만 다시 그림
+  function renderVoteOptionInputs() {
+    const ul = $('#vote-option-inputs');
+    if (!ul) return;
     ul.innerHTML = '';
-    unique.forEach((c) => {
+    const canRemove = state.voteDraftOptions.length > 2;
+    state.voteDraftOptions.forEach((value, idx) => {
       const li = document.createElement('li');
-      li.innerHTML = `<span>${escapeHtml(c.name)}</span><span class="muted">대기 중</span>`;
+      li.innerHTML = `
+        <input type="text" maxlength="40" placeholder="선택지 ${idx + 1}" value="${escapeHtml(value)}" />
+        <button type="button" class="btn btn-link" title="선택지 삭제" ${canRemove ? '' : 'disabled'}>✕</button>
+      `;
+      li.querySelector('input').addEventListener('input', (e) => {
+        state.voteDraftOptions[idx] = e.target.value;
+      });
+      li.querySelector('button').addEventListener('click', () => {
+        if (state.voteDraftOptions.length <= 2) return;
+        state.voteDraftOptions.splice(idx, 1);
+        renderVoteOptionInputs();
+      });
       ul.appendChild(li);
     });
-    $('#vote-active').classList.remove('hidden');
-    $('#vote-status-label').textContent = '🟡 후보 선정됨 — 시작/종료 시간 확인 후 [투표 생성]을 눌러주세요.';
-    $('#vote-timer').textContent = '';
-    $('#vote-results').innerHTML = '';
+    const addBtn = $('#btn-add-vote-option');
+    if (addBtn) addBtn.disabled = state.voteDraftOptions.length >= Voting.MAX_OPTIONS;
+  }
+
+  function getAllPeopleNames() {
+    return sortNamesByRoleAndName(state.people.map((p) => p.name));
+  }
+
+  // 아직 손대지 않았으면 등록된 대상자 전원이 참여 상태
+  function getVoteDraftParticipants() {
+    const all = getAllPeopleNames();
+    if (!Array.isArray(state.voteDraftParticipants)) return all;
+    return all.filter((name) => state.voteDraftParticipants.includes(name));
+  }
+
+  /**
+   * 참여 / 미참여 두 칸. 이름을 한 번 누르면 반대 칸으로 이동.
+   * onChange(names, joined) 로 변경을 알림.
+   */
+  function renderParticipantPicker(container, { joined, voted, disabled, onChange }) {
+    if (!container) return;
+    const all = getAllPeopleNames();
+    const joinedSet = new Set(joined);
+    // 대상자 명단에서 빠졌지만 투표에 남아 있는 사람도 보여줌
+    joined.forEach((name) => { if (!all.includes(name)) all.push(name); });
+    const votedSet = new Set(voted || []);
+    const inNames = all.filter((n) => joinedSet.has(n));
+    const outNames = all.filter((n) => !joinedSet.has(n));
+    const signature = JSON.stringify([inNames, outNames, [...votedSet], Boolean(disabled), state.people.map((p) => p.role || '')]);
+    if (container.dataset.signature === signature) return;
+    container.dataset.signature = signature;
+
+    const chip = (name) => `
+      <button type="button" class="participant-chip${votedSet.has(name) ? ' voted' : ''}" data-name="${escapeHtml(name)}" ${disabled ? 'disabled' : ''}
+        title="${joinedSet.has(name) ? '누르면 미참여로 이동' : '누르면 참여로 이동'}">
+        ${escapeHtml(formatPersonLabel(name))}${votedSet.has(name) ? ' ✓' : ''}
+      </button>`;
+    const empty = (text) => `<span class="participant-empty">${text}</span>`;
+
+    container.innerHTML = all.length ? `
+      <div class="vote-participants">
+        <div class="vote-subhead">
+          <span>참여 인원 <strong>${inNames.length}</strong>명</span>
+          <span class="participant-bulk">
+            <button type="button" class="btn btn-link" data-bulk="in" ${disabled ? 'disabled' : ''}>전체 참여</button>
+            <button type="button" class="btn btn-link" data-bulk="out" ${disabled ? 'disabled' : ''}>전체 제외</button>
+          </span>
+        </div>
+        <div class="participant-cols">
+          <div class="participant-col in">
+            <div class="participant-col-title">✅ 참여 ${inNames.length}</div>
+            <div class="participant-chips">${inNames.map(chip).join('') || empty('아무도 없어요')}</div>
+          </div>
+          <div class="participant-col out">
+            <div class="participant-col-title">⬜ 미참여 ${outNames.length}</div>
+            <div class="participant-chips">${outNames.map(chip).join('') || empty('모두 참여 중')}</div>
+          </div>
+        </div>
+        <p class="hint">${disabled ? '종료된 투표는 참여 인원을 바꿀 수 없어요.' : '이름을 누르면 참여 ↔ 미참여로 이동해요.'}</p>
+      </div>` : '<p class="hint">등록된 대상자가 없습니다. 설정 &gt; 대상자 추가에서 먼저 등록해주세요.</p>';
+
+    container.querySelectorAll('.participant-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name;
+        onChange([name], !joinedSet.has(name));
+      });
+    });
+    container.querySelectorAll('[data-bulk]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const toJoin = btn.dataset.bulk === 'in';
+        onChange(toJoin ? outNames : inNames, toJoin);
+      });
+    });
+  }
+
+  function renderVoteSetupParticipants() {
+    renderParticipantPicker($('#vote-setup-participants'), {
+      joined: getVoteDraftParticipants(),
+      onChange: (names, joined) => {
+        const set = new Set(getVoteDraftParticipants());
+        names.forEach((n) => (joined ? set.add(n) : set.delete(n)));
+        state.voteDraftParticipants = [...set];
+        renderVoteSetupParticipants();
+      },
+    });
+  }
+
+  async function changeActiveVoteParticipants(names, joined) {
+    const vote = Voting.get();
+    if (!vote || !names.length) return;
+    const losingBallots = joined ? [] : names.filter((n) => vote.ballots && vote.ballots[n]);
+    if (losingBallots.length && !(await confirmAppDialog(
+      '참여 제외',
+      `${losingBallots.join(', ')} 님은 이미 투표했어요. 미참여로 옮기면 표가 취소됩니다. 계속할까요?`,
+      { confirmText: '제외' }
+    ))) return;
+    try {
+      await Voting.setParticipants(names, joined);
+      renderVote();
+    } catch (e) { await showAppAlert('참여 인원 변경', e.message || '참여 인원 변경 중 오류가 발생했습니다.'); }
   }
 
   function renderVote() {
     clearVoteTimer();
-    const vote = Voting.get(state.meal);
-    const setup = document.querySelector('.vote-setup');
+    const vote = Voting.get();
+    const setup = $('.vote-setup');
+    const active = $('#vote-active');
     if (!vote) {
-      if (window.__pendingVoteCandidates && window.__pendingVoteCandidates.length >= 2) {
-        setVoteCreateEnabled(true);
-        if (setup) setup.classList.remove('hidden');
-        return;
-      }
-      setVoteCreateEnabled(false);
-      $('#vote-active').classList.add('hidden');
-      if (setup) setup.classList.remove('hidden');
+      setup.classList.remove('hidden');
+      active.classList.add('hidden');
+      renderVoteSetupParticipants();
       return;
     }
-    setVoteCreateEnabled(false);
-    if (setup) setup.classList.add('hidden');
-    $('#vote-active').classList.remove('hidden');
+    setup.classList.add('hidden');
+    active.classList.remove('hidden');
 
     const status = Voting.status(vote);
-    if (status === 'ended') {
-      ensureVoteWinnerRecorded(vote).catch((e) => console.warn('ensureVoteWinnerRecorded failed:', e));
-    }
-    const statusLabel = {
+    const ended = status === 'ended';
+    $('#vote-status-label').textContent = {
       pending: '🟡 투표 대기 중 (아직 시작 전)',
       open:    '🟢 투표 진행 중',
       ended:   '🔴 투표 종료',
     }[status];
-    $('#vote-status-label').textContent = statusLabel;
     $('#vote-timer').textContent = formatVoteRange(vote);
+    $('#btn-cancel-vote').classList.toggle('hidden', ended);
+    $('#btn-new-vote').classList.toggle('hidden', !ended);
 
-    const votedSet = new Set(
-      Array.isArray(vote.votedPeople)
-        ? vote.votedPeople
-        : Object.values(vote.votes || {}).flatMap((list) => Array.isArray(list) ? list : [])
-    );
-    const allowedVoters = Array.isArray(vote.voters) && vote.voters.length
-      ? vote.voters
-      : state.people.map((p) => p.name);
-    const remainingVoters = allowedVoters.filter((name) => !votedSet.has(name));
-    renderVoteVoterSelect(remainingVoters);
-    const hintEl = $('#vote-voter-hint');
-    if (hintEl) {
-      hintEl.textContent = remainingVoters.length
-        ? `남은 투표 가능 대상자: ${remainingVoters.length}명`
-        : '모든 대상자의 투표가 완료되었습니다.';
-    }
+    const tags = [vote.multi ? '복수 선택' : '단일 선택'];
+    if (vote.anonymous) tags.push('익명');
+    $('#vote-title-view').innerHTML = `${escapeHtml(vote.title)} ${tags.map((t) => `<span class="vote-tag">${escapeHtml(t)}</span>`).join('')}`;
+    const descEl = $('#vote-desc-view');
+    descEl.textContent = vote.description || '';
+    descEl.classList.toggle('hidden', !vote.description);
 
-    const ul = $('#vote-candidates');
-    ul.innerHTML = '';
-    vote.candidates.forEach((c) => {
-      const li = document.createElement('li');
-      const count = (vote.votes[c.id] || []).length;
-      const disabled = status !== 'open' || !remainingVoters.length;
-      li.innerHTML = `
-        <span>${escapeHtml(c.name)} <span class="muted">· ${count}표</span></span>
-        <button data-cid="${c.id}" ${disabled ? 'disabled' : ''}>${disabled ? '투표 불가' : '투표하기'}</button>
-      `;
-      li.querySelector('button').addEventListener('click', async () => {
-        const voterSelect = $('#vote-voter-select');
-        const name = voterSelect ? String(voterSelect.value || '').trim() : '';
-        if (!name) {
-          await showAppAlert('투표하기', '투표 대상자를 먼저 선택해주세요.');
-          if (voterSelect) voterSelect.focus();
-          return;
-        }
-        try {
-          await Voting.cast(state.meal, c.id, name);
-          renderVote();
-        } catch (e) { await showAppAlert('투표하기', e.message || '투표 중 오류가 발생했습니다.'); }
-      });
-      ul.appendChild(li);
+    const participants = Array.isArray(vote.participants) ? vote.participants : [];
+    const ballots = vote.ballots || {};
+    const votedNames = participants.filter((n) => ballots[n]);
+    const { scores, winners, voterCount } = Voting.tally(vote);
+
+    renderParticipantPicker($('#vote-participants'), {
+      joined: participants,
+      voted: votedNames,
+      disabled: ended,
+      onChange: changeActiveVoteParticipants,
     });
 
+    // 결과 발표
+    const winnerEl = $('#vote-winner');
+    if (ended) {
+      winnerEl.classList.remove('hidden');
+      winnerEl.textContent = !winners.length
+        ? '결과: 득표 없음'
+        : winners.length === 1
+          ? `🏆 결과: ${winners[0].label} (${winners[0].count}표)`
+          : `🏆 공동 1위: ${winners.map((w) => `${w.label} (${w.count}표)`).join(', ')}`;
+    } else {
+      winnerEl.classList.add('hidden');
+    }
+
+    // 투표하기
+    $('#vote-ballot').classList.toggle('hidden', ended);
+    const select = $('#vote-voter-select');
+    const prevVoter = select.value;
+    select.innerHTML = '<option value="">참여 인원을 선택하세요</option>';
+    sortNamesByRoleAndName(participants).forEach((name) => {
+      const op = document.createElement('option');
+      op.value = name;
+      op.textContent = `${formatPersonLabel(name)}${ballots[name] ? ' ✓ 투표함' : ''}`;
+      select.appendChild(op);
+    });
+    select.value = participants.includes(prevVoter) ? prevVoter : '';
+    const voter = select.value;
+    if (!voter) state.voteSelection = [];
+
+    const canVote = status === 'open' && Boolean(voter);
+    const optionList = $('#vote-options');
+    optionList.innerHTML = '';
+    vote.options.forEach((o) => {
+      const li = document.createElement('li');
+      const checked = state.voteSelection.includes(o.id);
+      li.innerHTML = `
+        <label class="vote-option${checked ? ' selected' : ''}">
+          <input type="${vote.multi ? 'checkbox' : 'radio'}" name="vote-option" value="${escapeHtml(o.id)}" ${checked ? 'checked' : ''} ${status === 'open' ? '' : 'disabled'} />
+          <span>${escapeHtml(o.label)}</span>
+        </label>
+      `;
+      li.querySelector('input').addEventListener('change', (e) => {
+        if (vote.multi) {
+          state.voteSelection = e.target.checked
+            ? [...new Set([...state.voteSelection, o.id])]
+            : state.voteSelection.filter((id) => id !== o.id);
+        } else {
+          state.voteSelection = [o.id];
+        }
+        $$('#vote-options .vote-option').forEach((label) => {
+          label.classList.toggle('selected', label.querySelector('input').checked);
+        });
+      });
+      optionList.appendChild(li);
+    });
+    const castBtn = $('#btn-cast-vote');
+    castBtn.disabled = !canVote;
+    castBtn.textContent = voter && ballots[voter] ? '투표 변경' : '투표하기';
+    $('#vote-voter-hint').textContent = status === 'pending'
+      ? '시작 시간이 되면 투표할 수 있어요.'
+      : !participants.length
+        ? '참여 인원이 없어요. 위에서 이름을 눌러 참여로 옮겨주세요.'
+        : voter && ballots[voter]
+          ? '이미 투표했어요. 다시 고르면 표를 바꿀 수 있어요.'
+          : '본인 이름을 고르고 선택지를 누른 뒤 투표하세요.';
+
+    // 현황
+    $('#vote-progress').textContent = `· ${participants.length}명 중 ${votedNames.length}명 투표`;
     const res = $('#vote-results');
     res.innerHTML = '';
-    const totalVotes = Object.values(vote.votes).reduce((a, list) => a + list.length, 0);
-    const sorted = [...vote.candidates].sort(
-      (a, b) => (vote.votes[b.id] || []).length - (vote.votes[a.id] || []).length
-    );
-    sorted.forEach((c) => {
-      const voters = vote.votes[c.id] || [];
-      const pct = totalVotes ? Math.round((voters.length / totalVotes) * 100) : 0;
+    const winnerIds = new Set(winners.map((w) => w.id));
+    scores.forEach((s) => {
+      const pct = voterCount ? Math.round((s.count / voterCount) * 100) : 0;
       const li = document.createElement('li');
+      if (ended && winnerIds.has(s.id)) li.classList.add('leader');
       li.innerHTML = `
-        <span><strong>${escapeHtml(c.name)}</strong></span>
-        <span class="muted">${voters.length}표 (${pct}%)</span>
+        <span><strong>${escapeHtml(s.label)}</strong></span>
+        <span class="muted">${s.count}표 (${pct}%)</span>
         <div class="bar"><div style="width:${pct}%"></div></div>
-        ${voters.length ? `<div class="vote-role-summary">${escapeHtml(formatVoteRoleSummary(voters))}</div>` : ''}
+        ${!vote.anonymous && s.voters.length ? `<div class="voters">${escapeHtml(s.voters.map(formatPersonLabel).join(', '))}</div>` : ''}
       `;
       res.appendChild(li);
     });
+    const notVoted = participants.filter((n) => !ballots[n]);
+    $('#vote-not-voted').textContent = notVoted.length
+      ? `${ended ? '투표 안 함' : '아직 투표 안 함'}: ${sortNamesByRoleAndName(notVoted).map(formatPersonLabel).join(', ')}`
+      : participants.length ? '🎉 참여 인원 모두 투표했어요.' : '';
 
-    if (status !== 'ended') {
+    if (!ended) {
       state.voteTimer = setInterval(() => {
         $('#vote-timer').textContent = formatVoteRange(vote);
-        const newStatus = Voting.status(vote);
-        if (newStatus !== status) renderVote();
+        if (Voting.status(vote) !== status) renderVote();
       }, 1000);
     }
   }
 
-  function renderVoteVoterSelect(remainingVoters) {
-    const select = $('#vote-voter-select');
-    if (!select) return;
-    const prev = select.value;
-    select.innerHTML = '<option value="">대상자를 선택하세요</option>';
-    remainingVoters.forEach((name) => {
-      const op = document.createElement('option');
-      op.value = name;
-      op.textContent = formatPersonLabel(name);
-      select.appendChild(op);
-    });
-    if (remainingVoters.includes(prev)) {
-      select.value = prev;
-    } else {
-      select.value = '';
-    }
-  }
-
-  function setVoteCreateEnabled(enabled) {
-    const btn = $('#btn-create-vote');
-    if (!btn) return;
-    btn.disabled = !enabled;
-    btn.title = enabled ? '' : '후보 무작위 선정 또는 후보 선택 투표를 먼저 진행하세요.';
-  }
-
-  function formatVoteRoleSummary(voters) {
-    const names = Array.isArray(voters) ? voters : [];
-    if (!names.length) return '';
-    const counts = new Map();
-    names.forEach((name) => {
-      const role = getPersonRoleByName(name) || '직책 미지정';
-      counts.set(role, (counts.get(role) || 0) + 1);
-    });
-    return Array.from(counts.entries())
-      .sort(([a], [b]) => getRoleSortIndex(a) - getRoleSortIndex(b) || a.localeCompare(b, 'ko'))
-      .map(([role, count]) => `${role} ${count}명`)
-      .join(' · ');
-  }
-
-  function getPersonRoleByName(name) {
-    const matched = state.people.find((p) => p.name === name);
-    return matched && matched.role ? matched.role : '';
-  }
-
-  function getRoleSortIndex(role) {
-    const idx = ROLE_OPTIONS.indexOf(role);
-    return idx >= 0 ? idx : Number.MAX_SAFE_INTEGER;
-  }
-
-  function openVoteHistoryModal(meal) {
-    const rows = [...Voting.getHistory(meal)]
+  function openVoteHistoryModal() {
+    const rows = [...Voting.getHistory()]
       .sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
     const backdrop = document.createElement('div');
     backdrop.className = 'visibility-modal-backdrop';
-    const mealName = mealLabel(meal);
     const itemsHtml = rows.length
       ? rows.map((row) => {
         const when = formatSeoulDateTime(row.endAt || row.createdAt || row.archivedAt);
-        const winnerText = formatWinnerText(row);
         return `
           <li>
-            <div class="vote-history-title">${escapeHtml(when)} · ${escapeHtml(mealName)}</div>
-            <div><strong>결과:</strong> ${escapeHtml(winnerText)}</div>
-            <div class="vote-history-meta">${escapeHtml(formatScoreText(row))}</div>
+            <div class="vote-history-title">${escapeHtml(when)} · ${escapeHtml(row.title || '(제목 없음)')}</div>
+            <div><strong>결과:</strong> ${escapeHtml(formatWinnerText(row))}</div>
+            <div class="vote-history-meta">${escapeHtml(formatScoreText(row))} · ${escapeHtml(`${row.participantCount || 0}명 중 ${row.voterCount || 0}명 투표`)}</div>
           </li>
         `;
       }).join('')
@@ -2173,7 +2346,7 @@
           <h3 class="vote-history-modal-title">🕘 이전 투표 기록</h3>
           <button type="button" class="btn btn-link vote-history-delete-btn" data-action="clear-history" ${rows.length ? '' : 'disabled'}>기록 삭제</button>
         </div>
-        <p class="muted">${escapeHtml(mealName)} 탭의 과거 최종 결과입니다.</p>
+        <p class="muted">종료되었거나 정리된 투표의 최종 결과입니다.</p>
         <ul class="vote-history-list">${itemsHtml}</ul>
         <div class="actions">
           <button type="button" data-action="close">닫기</button>
@@ -2197,13 +2370,13 @@
         if (!(await verifyVoteHistoryDeletePassword())) return;
         if (!(await confirmAppDialog(
           '이전 투표 기록 삭제',
-          `${mealName} 탭의 이전 투표 기록을 모두 삭제할까요?`,
+          '이전 투표 기록을 모두 삭제할까요?',
           { confirmText: '삭제' }
         ))) return;
         try {
-          await Voting.clearHistory(meal);
+          await Voting.clearHistory();
           close();
-          openVoteHistoryModal(meal);
+          openVoteHistoryModal();
         } catch (e) {
           console.warn('clear vote history failed:', e);
           await showAppAlert('이전 투표 기록 삭제', e.message || '기록 삭제에 실패했습니다.');
@@ -2214,17 +2387,18 @@
 
   function formatWinnerText(row) {
     const winners = Array.isArray(row && row.winners) ? row.winners : [];
-    if (!winners.length) return '무효(득표 없음)';
+    const label = (w) => w.label || w.name || '';
+    if (!winners.length) return '득표 없음';
     if (winners.length === 1) {
-      return `${winners[0].name} (${winners[0].count}표)`;
+      return `${label(winners[0])} (${winners[0].count}표)`;
     }
-    return `공동 1위: ${winners.map((w) => `${w.name}(${w.count}표)`).join(', ')}`;
+    return `공동 1위: ${winners.map((w) => `${label(w)}(${w.count}표)`).join(', ')}`;
   }
 
   function formatScoreText(row) {
     const scores = Array.isArray(row && row.scores) ? row.scores : [];
-    if (!scores.length) return '후보 정보 없음';
-    return scores.map((s) => `${s.name} ${s.count}표`).join(' · ');
+    if (!scores.length) return '선택지 정보 없음';
+    return scores.map((s) => `${s.label || s.name} ${s.count}표`).join(' · ');
   }
 
   function formatSeoulDateTime(ts) {
@@ -2280,7 +2454,7 @@
     );
   }
 
-  async function appendRandomWinnerHistory(meal, store, source, sourceRef) {
+  async function appendRandomWinnerHistory(meal, store, source, sourceRef, recordId) {
     if (!window.Storage || typeof window.Storage.saveRandomHistory !== 'function') return;
     if (window.WeekHistory && !window.WeekHistory.isWorkdayForRecording()) return;
     if (!store || !store.id) return;
@@ -2290,7 +2464,7 @@
       if (existing.some((r) => r.sourceRef === ref)) return;
     }
     const rec = {
-      id: uid('rh'),
+      id: recordId || uid('rh'),
       storeId: store.id,
       storeName: store.name || '',
       source: source || 'unknown',
@@ -2300,32 +2474,6 @@
     await window.Storage.saveRandomHistory(meal, rec);
     await loadRandomHistoryForMeal(meal);
     if (state.settingsSubtab === 'history') renderRandomHistoryManager();
-  }
-
-  async function ensureVoteWinnerRecorded(vote) {
-    if (!vote || !vote.id) return;
-    const winner = getVoteFinalWinner(vote);
-    if (!winner) return;
-    await appendRandomWinnerHistory(
-      vote.meal || state.meal,
-      { id: winner.id, name: winner.name },
-      'voteWinner',
-      `vote:${vote.id}`
-    );
-  }
-
-  function getVoteFinalWinner(vote) {
-    const candidates = Array.isArray(vote.candidates) ? vote.candidates : [];
-    if (!candidates.length) return null;
-    let best = null;
-    candidates.forEach((c, idx) => {
-      const count = Array.isArray(vote.votes && vote.votes[c.id]) ? vote.votes[c.id].length : 0;
-      if (!best || count > best.count || (count === best.count && idx < best.idx)) {
-        best = { id: c.id, name: c.name, count, idx };
-      }
-    });
-    if (!best || best.count <= 0) return null;
-    return best;
   }
 
   function bindRandomHistoryManager() {
@@ -2362,7 +2510,7 @@
     const list = $('#random-history-list');
     if (!list) return;
     const mealFilter = ($('#random-history-meal') && $('#random-history-meal').value) || 'all';
-    const meals = mealFilter === 'all' ? MEAL_TYPES : [mealFilter];
+    const meals = mealFilter === 'all' ? getVisibleMealTypes() : [mealFilter];
     const rows = meals
       .flatMap((meal) => (state.randomHistoryByMeal[meal] || []).map((r) => ({ ...r, meal })))
       .sort((a, b) => b.createdAt - a.createdAt);
@@ -2421,7 +2569,7 @@
     return new Promise((resolve) => {
       const backdrop = document.createElement('div');
       backdrop.className = 'visibility-modal-backdrop';
-      const isSoftDelete = title === '투표 종료/삭제' || title === '룰렛 초기화';
+      const isSoftDelete = title === '투표 종료/삭제';
       const modalClass = isSoftDelete
         ? 'visibility-modal vote-delete-confirm-modal'
         : 'visibility-modal';
@@ -2656,7 +2804,7 @@
 
     // 13:30 ~ 19:00
     const inDinnerWindow = minutesFromMidnight >= (13 * 60 + 30) && minutesFromMidnight <= (19 * 60);
-    if (isWeekday && inDinnerWindow) return 'dinner';
+    if (isWeekday && inDinnerWindow && isDinnerTabEnabled()) return 'dinner';
 
     return 'lunch';
   }
@@ -2671,8 +2819,25 @@
     );
   }
 
+  function getMainDisplayMeal() {
+    if (state.meal === 'lunch' && getAutoRouletteMealToday() === 'fridayLunch') return 'fridayLunch';
+    return state.meal;
+  }
+
+  // 지도에는 오늘 룰렛 당첨 가게만 표시 (결과가 나오기 전에는 회사만)
   function getVisibleStores() {
-    return getVisibleStoresForMeal(state.meal, { includeMeta: false });
+    const store = getSettledWinnerStore();
+    return store ? [store] : [];
+  }
+
+  function getSettledWinnerStore() {
+    const meal = getMainDisplayMeal();
+    const session = state.rouletteByMeal[meal];
+    if (!session || !session.winnerId) return null;
+    const endAt = Number(session.startAt || 0) + Number(session.durationMs || getRouletteSpinDurationMs());
+    if (Date.now() < endAt) return null;
+    return getVisibleStoresForMeal(meal).find((s) => s.id === session.winnerId)
+      || { id: session.winnerId, name: session.winnerName || '', lat: null, lng: null };
   }
 
   function getVisibleStoresForMeal(targetMeal, options = {}) {
@@ -2727,21 +2892,23 @@
     }
   }
 
-  async function pickRandomFromVisible(n) {
-    await loadRandomHistoryForMeal(state.meal);
-    const blockedByRecent = getRecentRandomBlockedIds(state.meal);
+  async function pickRandomFromVisible(n, meal = state.meal, random = Math.random) {
+    await loadRandomHistoryForMeal(meal);
+    const blockedByRecent = getRecentRandomBlockedIds(meal);
     const arr = dedupeStoresByUrl(
-      getVisibleStores().filter((s) => !isBlockedByCaution(s) && !blockedByRecent.has(s.id))
+      getVisibleStoresForMeal(meal).filter((s) => !isBlockedByCaution(s, meal) && !blockedByRecent.has(s.id))
     );
+    // 시드 난수를 쓸 때 브라우저마다 같은 결과가 나오도록 순서를 고정
+    if (random !== Math.random) arr.sort((a, b) => String(a.id).localeCompare(String(b.id)));
     const out = [];
     while (arr.length && out.length < n) {
-      const idx = Math.floor(Math.random() * arr.length);
+      const idx = Math.floor(random() * arr.length);
       out.push(arr.splice(idx, 1)[0]);
     }
     return out;
   }
 
-  function isBlockedByCaution(store) {
+  function isBlockedByCaution(store, meal = state.meal) {
     const cautionNames = new Set(state.cautions.map((c) => c.name));
     const eatingOut = state.assignments.outside.filter((n) => cautionNames.has(n));
     const hasStoreBlocks = state.assignments.outside.some((name) => {
@@ -2757,7 +2924,7 @@
       keys.forEach((k) => blockedStoreKeys.add(k));
     });
     if (!blockedStoreKeys.size) return false;
-    const storeKey = getStoreBlockKeyFromStore(store, state.meal);
+    const storeKey = getStoreBlockKeyFromStore(store, meal);
     return blockedStoreKeys.has(storeKey);
   }
 
@@ -2787,20 +2954,21 @@
         { value: 'lunch', label: '점심' },
         { value: 'fridayLunch', label: '금요일 점심' },
         { value: 'dinner', label: '저녁' },
-      ],
+      ].filter((op) => getVisibleMealTypes().includes(op.value)),
       selected: current,
       saveLabel: '저장',
       requireAtLeastOne: true,
     });
     if (!selected) return;
+    // 숨긴 저녁 탭 노출 설정은 화면에 없더라도 그대로 보존
+    const hiddenKept = current.filter((meal) => !getVisibleMealTypes().includes(meal));
     await Stores.update(sourceMeal, store.id, {
-      visibleMeals: selected,
+      visibleMeals: [...new Set([...selected, ...hiddenKept])],
       showInFridayLunchTab: false,
       showInCompanionLunchTab: false,
     });
     renderSettingsStoreList();
     if (MEAL_TYPES.includes(state.activeTab)) {
-      renderStoreList();
       Maps.renderStores(getVisibleStores());
     }
   }
@@ -2830,7 +2998,6 @@
     await Stores.update(sourceMeal, store.id, { avoidFor: selected });
     renderSettingsStoreList();
     if (MEAL_TYPES.includes(state.activeTab)) {
-      renderStoreList();
       Maps.renderStores(getVisibleStores());
     }
   }
@@ -2972,7 +3139,7 @@
       });
     });
     const allMap = new Map();
-    MEAL_TYPES.forEach((meal) => {
+    getVisibleMealTypes().forEach((meal) => {
       (byMeal[meal] || []).forEach((op) => {
         if (allMap.has(op.value)) return;
         allMap.set(op.value, { ...op });
@@ -3047,7 +3214,7 @@
             <button type="button" class="store-block-tab active" data-meal="all">전체</button>
             <button type="button" class="store-block-tab" data-meal="lunch">점심</button>
             <button type="button" class="store-block-tab" data-meal="fridayLunch">금요일 점심</button>
-            <button type="button" class="store-block-tab" data-meal="dinner">저녁</button>
+            ${isDinnerTabEnabled() ? '<button type="button" class="store-block-tab" data-meal="dinner">저녁</button>' : ''}
           </div>
           <div class="store-block-search-row">
             <input type="text" id="store-block-search" class="store-search-input" placeholder="가게 이름 검색" />

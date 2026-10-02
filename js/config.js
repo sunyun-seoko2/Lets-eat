@@ -17,6 +17,7 @@
  * pollIntervalRouletteMs: 룰렛 회전 중 폴링 간격 (ms).
  * rouletteSpinLeadMs: 다른 브라우저가 회전 세션을 받을 수 있도록 실제 시작 전 대기 시간 (ms).
  * rouletteSpinDurationMs: 회전 애니메이션 시간 (ms).
+ * showDinnerTab: 저녁 탭 표시 여부. false 면 탭만 숨기고 기능 코드와 데이터는 그대로 둠.
  */
 window.AppConfig = {
   storage: 'azure',
@@ -37,4 +38,6 @@ window.AppConfig = {
   pollIntervalRouletteMs: 1000, // 룰렛 회전 중 폴링 주기
   rouletteSpinLeadMs: 2000,    // 다른 사용자 브라우저가 회전 시작 전에 세션을 받을 시간
   rouletteSpinDurationMs: 8000,
+
+  showDinnerTab: false,        // 저녁 탭을 다시 쓰려면 true 로 변경
 };

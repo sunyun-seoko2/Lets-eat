@@ -16,6 +16,7 @@
   const KEY_VOTE   = (meal) => `ls.vote.${meal}`;
   const KEY_VOTE_HISTORY = (meal) => `ls.vote.history.${meal}`;
   const KEY_ROULETTE = (meal) => `ls.roulette.${meal}`;
+  const KEY_ROULETTE_HISTORY = 'ls.roulette.history';
   const KEY_RANDOM_HISTORY = (meal) => `ls.random.history.${meal}`;
   const KEY_PEOPLE = 'ls.people.v1';
   const KEY_CAUTION = 'ls.cautions.v1';
@@ -55,6 +56,25 @@
     },
     async clearRoulette(meal) {
       localStorage.removeItem(KEY_ROULETTE(meal));
+    },
+    async getRouletteHistory() {
+      const rows = safeParse(localStorage.getItem(KEY_ROULETTE_HISTORY), []);
+      return Array.isArray(rows) ? rows : [];
+    },
+    async saveRouletteHistory(record) {
+      const rows = (await this.getRouletteHistory()).filter((r) => String(r.id) !== String(record.id));
+      rows.push(record);
+      localStorage.setItem(KEY_ROULETTE_HISTORY, JSON.stringify(rows));
+    },
+    async deleteRouletteHistory(recordId) {
+      const rows = await this.getRouletteHistory();
+      localStorage.setItem(
+        KEY_ROULETTE_HISTORY,
+        JSON.stringify(rows.filter((r) => String(r.id) !== String(recordId)))
+      );
+    },
+    async clearRouletteHistory() {
+      localStorage.removeItem(KEY_ROULETTE_HISTORY);
     },
     async getVoteHistory(meal) {
       const rows = safeParse(localStorage.getItem(KEY_VOTE_HISTORY(meal)), []);
