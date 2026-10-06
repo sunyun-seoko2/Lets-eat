@@ -404,6 +404,10 @@ main {
   justify-content: flex-end;
 }
 
+.form-actions.reg-actions {
+  margin-top: 16px;
+}
+
 .taste-care-panel .form-actions {
   gap: 8px;
 }

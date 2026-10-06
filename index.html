@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>밥먹자!</title>
-  <link rel="stylesheet" href="styles.css?v=29" />
+  <link rel="stylesheet" href="styles.css?v=30" />
   <script>
     // Apply saved theme immediately to prevent flash of light theme
     (function () {
@@ -260,11 +260,16 @@
       <p class="hint" id="reg-target-hint"></p>
 
       <div class="form-row">
+        <label>네이버 지도 URL (선택)
+          <input id="reg-url" type="url" placeholder="https://map.naver.com/p/entry/place/... (바로가기 링크용)" />
+        </label>
+      </div>
+      <div class="form-row">
         <label>메모 (선택)
           <input id="reg-memo" type="text" placeholder="예: 점심특선 9,000원 · 매운 음식 추천 등" />
         </label>
       </div>
-      <div class="form-actions">
+      <div class="form-actions reg-actions">
         <button id="btn-auto-add" class="btn btn-primary">주소로 등록</button>
       </div>
       <div id="auto-add-status" class="auto-status"></div>
@@ -304,7 +309,7 @@
   <script src="js/week-history.js?v=1"></script>
   <script src="js/roulette.js?v=12"></script>
   <script src="js/voting.js?v=11"></script>
-  <script src="js/app.js?v=34"></script>
+  <script src="js/app.js?v=35"></script>
 </body>
 
 </html>

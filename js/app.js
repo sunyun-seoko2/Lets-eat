@@ -1175,11 +1175,12 @@
 
   // ---------- 공통: 주소로 가게 등록 ----------
   /**
-   * 이름 + 주소로 가게 등록. 주소는 네이버 지도 SDK Geocoder 로 좌표 변환.
+   * 이름 + 주소(+ 선택 URL)로 가게 등록. 주소는 네이버 지도 SDK Geocoder 로 좌표 변환.
+   * URL 은 좌표 추출에 쓰지 않고 '네이버 지도에서 보기' 바로가기 링크로만 저장.
    * statusCb(kind, msg): 'success' | 'warn' | 'error' | '' (info)
    * 반환: { store, warnNoCoords }
    */
-  async function registerStoreByAddress({ meal, name, address, memo, statusCb }) {
+  async function registerStoreByAddress({ meal, name, address, url, memo, statusCb }) {
     const setStatus = (kind, msg) => { if (statusCb) statusCb(kind, msg); };
 
     setStatus('', `🔍 "${address}" 좌표 찾는 중…`);
@@ -1192,7 +1193,7 @@
     try {
       store = await Stores.add(meal, {
         name,
-        url: '',
+        url: url || '',
         address: (geo && geo.address) || address,
         lat, lng,
         memo: (memo || '').trim(),
@@ -1226,6 +1227,7 @@
     $('#btn-auto-add').addEventListener('click', async () => {
       const name = $('#reg-name').value.trim();
       const address = $('#reg-address').value.trim();
+      const url = $('#reg-url').value.trim();
       const memo = $('#reg-memo').value.trim();
       const meal = getRegisterMeal();
       const statusEl = $('#auto-add-status');
@@ -1244,11 +1246,12 @@
         return;
       }
 
-      const result = await registerStoreByAddress({ meal, name, address, memo, statusCb: setStatus });
+      const result = await registerStoreByAddress({ meal, name, address, url, memo, statusCb: setStatus });
       if (!result) return;
 
       $('#reg-name').value = '';
       $('#reg-address').value = '';
+      $('#reg-url').value = '';
       $('#reg-memo').value = '';
       renderSettingsStoreList();
       if (result.warnNoCoords) beginPickMode(result.store.id, meal);
