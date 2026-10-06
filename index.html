@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>밥먹자!</title>
-  <link rel="stylesheet" href="styles.css?v=28" />
+  <link rel="stylesheet" href="styles.css?v=29" />
   <script>
     // Apply saved theme immediately to prevent flash of light theme
     (function () {
@@ -179,7 +179,7 @@
     </section>
 
     <section class="card settings-subpanel" data-settings-panel="people">
-      <h2>👥 위(胃)대한 명단 관리</h2>
+      <h2>👥 밥먹자 명단 관리</h2>
       <div class="form-row two">
         <label>대상자 이름
           <input id="person-name" type="text" placeholder="예: 홍길동" />
@@ -269,43 +269,6 @@
       </div>
       <div id="auto-add-status" class="auto-status"></div>
 
-      <details class="manual-form">
-        <summary>수동으로 직접 입력하기</summary>
-        <form id="store-form" class="store-form">
-          <div class="form-row">
-            <label>가게 이름 *
-              <input type="text" id="store-name" required placeholder="예: 김밥천국 강남점" />
-            </label>
-          </div>
-          <div class="form-row">
-            <label>네이버 지도 URL
-              <input type="url" id="store-url" placeholder="https://map.naver.com/... (선택)" />
-            </label>
-          </div>
-          <div class="form-row">
-            <label>주소 (지도 표시용)
-              <input type="text" id="store-address" placeholder="예: 서울시 강남구 테헤란로 123" />
-            </label>
-            <button type="button" id="btn-geocode" class="btn btn-secondary">📍 좌표 찾기</button>
-          </div>
-          <div class="form-row two">
-            <label>위도(lat)
-              <input type="number" step="any" id="store-lat" placeholder="자동 채워짐" />
-            </label>
-            <label>경도(lng)
-              <input type="number" step="any" id="store-lng" placeholder="자동 채워짐" />
-            </label>
-          </div>
-          <div class="form-row">
-            <label>메모
-              <input type="text" id="store-memo" placeholder="예: 점심특선 9,000원" />
-            </label>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">+ 등록</button>
-          </div>
-        </form>
-      </details>
     </section>
 
     <section class="card settings-subpanel hidden" data-settings-panel="stores">
@@ -337,11 +300,11 @@
   <script src="js/storage.js?v=12"></script>
   <script src="js/storage-azure.js?v=12"></script>
   <script src="js/stores.js?v=9"></script>
-  <script src="js/maps.js?v=14"></script>
+  <script src="js/maps.js?v=15"></script>
   <script src="js/week-history.js?v=1"></script>
   <script src="js/roulette.js?v=12"></script>
   <script src="js/voting.js?v=11"></script>
-  <script src="js/app.js?v=33"></script>
+  <script src="js/app.js?v=34"></script>
 </body>
 
 </html>

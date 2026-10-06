@@ -41,7 +41,6 @@
     Roulette.init('roulette-canvas');
 
     bindTabs();
-    bindStoreForm();
     bindAutoAdd();
     bindStoreSearch();
     bindVoting();
@@ -1275,61 +1274,6 @@
       } finally {
         moveBtn.disabled = false;
         moveBtn.textContent = '📍 내 위치로 이동';
-      }
-    });
-  }
-
-  // ---------- Settings: Manual form ----------
-  function bindStoreForm() {
-    $('#store-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const meal = getRegisterMeal();
-      const name = $('#store-name').value.trim();
-      if (!name) return;
-
-      let lat = $('#store-lat').value;
-      let lng = $('#store-lng').value;
-      const url = $('#store-url').value.trim();
-      const address = $('#store-address').value.trim();
-
-      if ((!lat || !lng) && url) {
-        const parsed = Maps.parseUrl(url);
-        if (parsed && parsed.lat != null) { lat = parsed.lat; lng = parsed.lng; }
-      }
-      if ((!lat || !lng) && address) {
-        const r = await Maps.geocode(address);
-        if (r) { lat = r.lat; lng = r.lng; }
-      }
-
-      try {
-        await Stores.add(meal, {
-          name, url, address,
-          lat: lat || null,
-          lng: lng || null,
-          memo: $('#store-memo').value.trim(),
-        });
-      } catch (err) {
-        await showAppAlert('가게 등록', err && err.message ? err.message : '가게 등록 중 오류가 발생했습니다.');
-        return;
-      }
-      $('#store-form').reset();
-      renderSettingsStoreList();
-    });
-
-    $('#btn-geocode').addEventListener('click', async () => {
-      const address = $('#store-address').value.trim();
-      const url = $('#store-url').value.trim();
-      let result = null;
-      if (url) {
-        const p = Maps.parseUrl(url);
-        if (p && p.lat != null) result = { lat: p.lat, lng: p.lng };
-      }
-      if (!result && address) result = await Maps.geocode(address);
-      if (result) {
-        $('#store-lat').value = result.lat;
-        $('#store-lng').value = result.lng;
-      } else {
-        await showAppAlert('좌표 찾기', '좌표를 찾지 못했습니다. 주소를 더 상세히 입력하거나, 위도/경도를 직접 입력해주세요.');
       }
     });
   }

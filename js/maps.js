@@ -247,66 +247,6 @@
     },
 
     /**
-     * Naver Map URL 파싱 (best-effort)
-     * 추출 시도:
-     *   - name: searchText / bk_query / path의 search 다음 세그먼트
-     *   - placeId: path의 place 다음 세그먼트
-     *   - lat/lng: c= 파라미터에서 한국 좌표 범위 매칭
-     * 단축 URL(naver.me/...)은 CORS 때문에 해석 불가.
-     */
-    parseUrl(url) {
-      if (!url) return null;
-      const result = { name: null, placeId: null, lat: null, lng: null, address: null, url };
-      try {
-        const u = new URL(url);
-
-        // 1) Query 파라미터 기반
-        const searchText = u.searchParams.get('searchText');
-        const bkQuery = u.searchParams.get('bk_query');
-        if (searchText) result.name = safeDecode(searchText);
-        else if (bkQuery) result.name = safeDecode(bkQuery);
-
-        // 2) 경로 기반: /p/search/{name}/place/{id} or /p/entry/place/{id}
-        const pathParts = u.pathname.split('/').filter(Boolean);
-        const searchIdx = pathParts.indexOf('search');
-        if (searchIdx >= 0 && pathParts[searchIdx + 1] && !result.name) {
-          result.name = safeDecode(pathParts[searchIdx + 1]);
-        }
-        const placeIdx = pathParts.indexOf('place');
-        if (placeIdx >= 0 && pathParts[placeIdx + 1]) {
-          result.placeId = pathParts[placeIdx + 1].split('?')[0];
-        }
-
-        // 3) c= 좌표
-        const c = u.searchParams.get('c');
-        if (c) {
-          const parts = c.split(',').map(Number).filter((n) => !Number.isNaN(n));
-          for (let i = 0; i < parts.length - 1; i++) {
-            const a = parts[i], b = parts[i + 1];
-            // Korean lng range 124~132, lat range 33~39
-            if (a >= 124 && a <= 132 && b >= 33 && b <= 39) { result.lng = a; result.lat = b; break; }
-            if (b >= 124 && b <= 132 && a >= 33 && a <= 39) { result.lat = a; result.lng = b; break; }
-          }
-        }
-
-        // placePath 안의 추가 쿼리(bk_query 등)도 시도
-        const placePath = u.searchParams.get('placePath');
-        if (placePath && !result.name) {
-          const fakeUrl = 'https://x' + (placePath.startsWith('/') ? placePath : '/' + placePath);
-          try {
-            const p = new URL(fakeUrl);
-            const bk2 = p.searchParams.get('bk_query');
-            if (bk2) result.name = safeDecode(bk2);
-          } catch (e) { /* ignore */ }
-        }
-
-        return result;
-      } catch (e) {
-        return null;
-      }
-    },
-
-    /**
      * 지도 클릭 모드 활성화. 다음 클릭 좌표가 callback(lat, lng)로 전달되고
      * 자동으로 모드 종료.
      */
@@ -412,9 +352,6 @@
     return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
   }
 
-  function safeDecode(s) {
-    try { return decodeURIComponent(s); } catch { return s; }
-  }
   function ensureFixedCompanyMarker() {
     if (!ready() || !map) return;
     const position = new naver.maps.LatLng(FIXED_LOCATION.lat, FIXED_LOCATION.lng);

@@ -1759,24 +1759,6 @@ main {
   margin-right: 2px;
 }
 
-.manual-form {
-  margin-top: 14px;
-  border-top: 1px dashed var(--border);
-  padding-top: 10px;
-}
-
-.manual-form summary {
-  cursor: pointer;
-  color: var(--primary-dark);
-  font-size: 14px;
-  padding: 6px 0;
-  user-select: none;
-}
-
-.manual-form[open] summary {
-  margin-bottom: 8px;
-}
-
 .auto-status {
   margin-top: 12px;
   font-size: 13px;
