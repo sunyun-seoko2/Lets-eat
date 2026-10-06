@@ -90,7 +90,7 @@
         <button id="btn-roulette-history" class="btn btn-secondary vote-history-btn" type="button" title="이전 룰렛 기록">🕘 이전 룰렛
           기록</button>
       </div>
-      <p class="hint">평일 오전 11:00에 점심 메뉴 룰렛이 자동으로 돌아갑니다. 금요일 오전 11:00에 돌아가는 룰렛은 금요일 전용 가게만 포함 됩니다.</p>
+      <p class="hint">평일 11:00 ~ 13:00 사이 접속 시에 점심 메뉴 룰렛이 자동으로 돌아갑니다. 금요일에 돌아가는 룰렛은 금요일 전용 가게만 포함 됩니다.</p>
       <div class="roulette-stage">
         <canvas id="roulette-canvas" width="440" height="440"></canvas>
         <div id="roulette-pointer">▼</div>
@@ -244,12 +244,12 @@
     <section class="card settings-subpanel hidden" data-settings-panel="stores">
       <h2>🪄 URL로 빠른 등록</h2>
       <div class="form-row">
-        <label>가게 이름 검색
-          <input id="store-search-settings-top" type="text" placeholder="등록 여부를 확인할 가게 이름" />
+        <label>가게 이름 *
+          <input id="reg-name" type="text" placeholder="예: 김밥천국 강남점" />
         </label>
       </div>
       <p class="hint">
-        네이버 지도에서 가게 페이지의 URL을 복사해 붙여넣으면 가게 이름과 좌표를 자동으로 추출합니다.
+        네이버 지도에서 가게 페이지의 URL을 복사해 붙여넣으면 좌표를 자동으로 추출합니다.
         <br />예: <code>https://map.naver.com/p/search/김밥천국/place/1194911319?c=...</code>
       </p>
       <p class="hint" id="reg-target-hint"></p>
@@ -342,7 +342,7 @@
   <script src="js/week-history.js?v=1"></script>
   <script src="js/roulette.js?v=12"></script>
   <script src="js/voting.js?v=11"></script>
-  <script src="js/app.js?v=30"></script>
+  <script src="js/app.js?v=32"></script>
 </body>
 
 </html>

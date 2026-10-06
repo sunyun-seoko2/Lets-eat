@@ -621,27 +621,15 @@
   }
 
   function bindStoreSearch() {
-    const syncSettingsSearch = (nextValue, sourceEl) => {
+    const syncSettingsSearch = (nextValue) => {
       state.settingsStoreSearch = (nextValue || '').trim().toLowerCase();
-      const top = $('#store-search-settings-top');
-      const list = $('#store-search-settings-list');
-      [top, list].forEach((el) => {
-        if (!el || el === sourceEl) return;
-        el.value = nextValue || '';
-      });
       if (state.activeTab === 'settings') renderSettingsStoreList();
     };
 
-    const settingsTop = $('#store-search-settings-top');
-    if (settingsTop) {
-      settingsTop.addEventListener('input', () => {
-        syncSettingsSearch(settingsTop.value, settingsTop);
-      });
-    }
     const settingsList = $('#store-search-settings-list');
     if (settingsList) {
       settingsList.addEventListener('input', () => {
-        syncSettingsSearch(settingsList.value, settingsList);
+        syncSettingsSearch(settingsList.value);
       });
     }
   }
@@ -1276,6 +1264,7 @@
   // ---------- Settings: Auto-add (URL 폼) ----------
   function bindAutoAdd() {
     $('#btn-auto-add').addEventListener('click', async () => {
+      const manualName = $('#reg-name').value.trim();
       const url = $('#reg-url').value.trim();
       const memo = $('#reg-memo').value.trim();
       const meal = getRegisterMeal();
@@ -1286,14 +1275,19 @@
         statusEl.textContent = msg;
       };
 
+      if (!manualName) {
+        setStatus('error', '가게 이름을 입력해주세요.');
+        return;
+      }
       if (!url) {
         setStatus('error', 'URL을 입력해주세요.');
         return;
       }
 
-      const result = await registerStoreSmart({ meal, url, memo, statusCb: setStatus });
+      const result = await registerStoreSmart({ meal, url, manualName, memo, statusCb: setStatus });
       if (!result) return;
 
+      $('#reg-name').value = '';
       $('#reg-url').value = '';
       $('#reg-memo').value = '';
       renderSettingsStoreList();
@@ -1830,9 +1824,8 @@
           spunAt: session.startAt,
           winnerId: winner.id,
           winnerName: winner.name,
-          candidates: items.map((it) => it.name),
           onTime: minutes === ROULETTE_AUTO_START_MINUTES,
-          outsideCount: (state.assignments.outside || []).length,
+          walk: Maps.estimateWalk(Stores.getById(meal, winner.id)),
         });
       }
       if (meal === getMainDisplayMeal() && MEAL_TYPES.includes(state.activeTab)) renderRouletteFromShared();
@@ -1879,6 +1872,13 @@
     });
   }
 
+  // 기록에 저장된 도보 정보, 없으면(예전 기록) 현재 가게 좌표로 계산
+  function getRouletteRecordWalk(row) {
+    if (row.walk && Number.isFinite(row.walk.minutes)) return row.walk;
+    const store = row.meal && row.winnerId ? Stores.getById(row.meal, row.winnerId) : null;
+    return Maps.estimateWalk(store);
+  }
+
   function openRouletteHistoryModal(records) {
     const rows = [...(Array.isArray(records) ? records : [])]
       .sort((a, b) => (b.spunAt || 0) - (a.spunAt || 0))
@@ -1889,15 +1889,17 @@
       ? rows.map((row, idx) => {
         const no = rows.length - idx;
         const runText = row.onTime ? '11:00 정시 실행' : '늦은 실행 (11:00 이후 첫 접속)';
-        const candidates = Array.isArray(row.candidates) ? row.candidates : [];
         const meta = [mealLabel(row.meal), runText];
-        if (Number.isFinite(row.outsideCount)) meta.push(`외식 ${row.outsideCount}명`);
+        const walk = getRouletteRecordWalk(row);
+        const walkText = walk
+          ? `🚶 회사 → 가게 도보 약 ${walk.minutes}분 (약 ${Maps.formatMeters(walk.walkM)}, 직선 ${Maps.formatMeters(walk.straightM)})`
+          : '🚶 도보 정보 없음 (가게 좌표 미확인)';
         return `
           <li>
             <div class="vote-history-title">No.${no} · ${escapeHtml(formatSeoulDateTimeWithWeekday(row.spunAt))}</div>
             <div><strong>당첨:</strong> ${escapeHtml(row.winnerName || '-')}</div>
             <div class="vote-history-meta">${escapeHtml(meta.join(' · '))}</div>
-            ${candidates.length ? `<div class="vote-history-meta">후보 ${candidates.length}곳: ${escapeHtml(candidates.join(', '))}</div>` : ''}
+            <div class="vote-history-meta">${escapeHtml(walkText)}</div>
           </li>
         `;
       }).join('')
