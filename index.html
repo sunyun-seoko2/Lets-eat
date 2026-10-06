@@ -242,30 +242,30 @@
     </section>
 
     <section class="card settings-subpanel hidden" data-settings-panel="stores">
-      <h2>🪄 URL로 빠른 등록</h2>
+      <h2>🪄 주소로 빠른 등록</h2>
       <div class="form-row">
         <label>가게 이름 *
           <input id="reg-name" type="text" placeholder="예: 김밥천국 강남점" />
         </label>
       </div>
+      <div class="form-row">
+        <label>주소 *
+          <input id="reg-address" type="text" placeholder="예: 서울 종로구 창경궁로 120" />
+        </label>
+      </div>
       <p class="hint">
-        네이버 지도에서 가게 페이지의 URL을 복사해 붙여넣으면 좌표를 자동으로 추출합니다.
-        <br />예: <code>https://map.naver.com/p/search/김밥천국/place/1194911319?c=...</code>
+        네이버 지도에서 가게 주소 옆 <b>복사</b> 버튼을 눌러 붙여넣으면 좌표를 자동으로 찾아 등록합니다.
+        좌표를 못 찾으면 지도에서 위치를 직접 클릭해 지정할 수 있어요.
       </p>
       <p class="hint" id="reg-target-hint"></p>
 
-      <div class="form-row">
-        <label>네이버 지도 URL *
-          <input id="reg-url" type="url" placeholder="https://map.naver.com/p/search/.../place/..." />
-        </label>
-      </div>
       <div class="form-row">
         <label>메모 (선택)
           <input id="reg-memo" type="text" placeholder="예: 점심특선 9,000원 · 매운 음식 추천 등" />
         </label>
       </div>
       <div class="form-actions">
-        <button id="btn-auto-add" class="btn btn-primary">URL로 자동 등록</button>
+        <button id="btn-auto-add" class="btn btn-primary">주소로 등록</button>
       </div>
       <div id="auto-add-status" class="auto-status"></div>
 
@@ -333,16 +333,15 @@
     src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=hxjr338ho7&submodules=geocoder">
     </script>
 
-  <script src="js/config.js?v=12"></script>
+  <script src="js/config.js?v=13"></script>
   <script src="js/storage.js?v=12"></script>
   <script src="js/storage-azure.js?v=12"></script>
   <script src="js/stores.js?v=9"></script>
   <script src="js/maps.js?v=14"></script>
-  <script src="js/naver-api.js?v=9"></script>
   <script src="js/week-history.js?v=1"></script>
   <script src="js/roulette.js?v=12"></script>
   <script src="js/voting.js?v=11"></script>
-  <script src="js/app.js?v=32"></script>
+  <script src="js/app.js?v=33"></script>
 </body>
 
 </html>

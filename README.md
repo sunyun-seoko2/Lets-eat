@@ -65,14 +65,13 @@ Azure Table Storage 를 저장소로 쓰면 여러 사람이 같은 화면을 �
 - 모바일에서는 탭(터치) 메뉴로 그룹 이동
 
 ### 🏪 가게 등록
-- 이름 · 네이버 지도 URL · 주소 · 좌표 · 메모
+- 이름 · 주소 · 좌표 · 메모 (수동 입력에서는 네이버 지도 URL도 선택 입력)
 - 새 가게는 **점심** 에 등록됩니다. 금요일 점심에도 쓰려면 설정의 가게 목록에서 **중복 허용** 으로 *금요일 점심* 을 선택합니다. *점심* 을 해제하면 금요일 전용 가게가 됩니다.
 - 설정의 가게 목록에는 점심 · 금요일 점심 가게가 모두 나오고, 이름 옆에 룰렛에 쓰이는 탭이 표시됩니다.
-- **🪄 URL로 빠른 등록**: 가게 이름(예: 김밥천국 강남점)을 입력하고 네이버 지도 URL을 붙여넣으면 좌표 등 정보 자동 추출
-  1. URL 파싱 → `placeId` / `c=` 좌표 (가게 이름은 입력한 값 사용)
-  2. `placeId` 가 있으면 CORS 프록시로 `m.place.naver.com` 을 읽어 이름·주소·좌표·전화번호·카테고리 추출
-  3. 좌표가 없으면 이름으로 Naver Geocoder 검색
-  4. 그래도 없으면 **📍 지도에서 좌표 지정** 으로 직접 클릭
+- **🪄 주소로 빠른 등록**: 가게 이름(예: 김밥천국 강남점)과 주소를 입력하면 좌표를 자동으로 찾아 등록
+  1. 네이버 지도에서 가게 주소 옆 **복사** 버튼으로 주소를 복사해 붙여넣기
+  2. 네이버 지도 SDK 의 Geocoder 로 주소 → 좌표 변환 (NCP 애플리케이션에 **Geocoding** 서비스가 켜져 있어야 함)
+  3. 좌표를 못 찾으면 **📍 지도에서 좌표 지정** 으로 직접 클릭
 
 ### 🗺️ 지도
 - **오늘 룰렛 당첨 가게만** 지도에 표시합니다. 결과가 나오기 전에는 회사(🏢)만 보입니다. 마커를 누르면 상세 정보 말풍선이 열리고, 말풍선이 열려 있는 동안에는 겹치지 않도록 마커의 가게 이름을 숨깁니다 (말풍선 글자는 다크 모드에서도 검정).
@@ -157,8 +156,6 @@ npx http-server -p 8000
 | `azure.account` | — | Storage Account 이름 |
 | `azure.sas` | — | SAS 토큰 (앞의 `?` 제외) |
 | `azure.tableStores` · `tableVotes` · `tablePeople` · `tableRandomHistory` | `stores` · `votes` · `people` · `randomhistory` | 테이블 이름 |
-| `corsProxy` | `https://corsproxy.io/?url=` | 네이버 place 페이지를 가져올 CORS 프록시 |
-| `placeLookup` | `true` | URL 빠른 등록 시 자동 추출 사용 여부 |
 | `pollIntervalMs` | `3000` | 평시 폴링 간격 (ms) |
 | `pollIntervalVoteMs` | `3000` | 투표 진행 중 폴링 간격 (ms) |
 | `pollIntervalRouletteMs` | `1000` | 룰렛 회전 중 폴링 간격 (ms) |
@@ -179,16 +176,6 @@ npx http-server -p 8000
   - `http://localhost:8000`
   - `https://<USERNAME>.github.io`
 - 등록 후 반영까지 1~2분 걸립니다. 빠지면 `Authentication Failed` 가 발생합니다.
-
-### CORS 프록시 교체 (선택)
-
-공개 프록시(`corsproxy.io`)는 느리거나 차단될 수 있습니다. Cloudflare Worker / Azure Function 등으로 자체 프록시를 두고 `corsProxy` 값을 바꾸면 안정적입니다.
-
-```js
-corsProxy: 'https://your-worker.your-subdomain.workers.dev/?url=',
-```
-
-더 정확한 방법은 HTML 스크래핑 대신 [Naver Developers 지역 검색 API](https://developers.naver.com/docs/serviceapi/search/local/local.md)를 쓰는 것입니다. 이 경우 Client Secret 은 프록시 환경변수에 두고, [`js/naver-api.js`](js/naver-api.js) 를 해당 API 호출로 교체하세요.
 
 ## 배포 (GitHub Pages)
 
@@ -278,7 +265,6 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
     ├── storage-azure.js  # Azure Table Storage 어댑터
     ├── stores.js         # 가게 CRUD
     ├── maps.js           # 네이버 지도 · Geocoder · 마커
-    ├── naver-api.js      # 네이버 place 페이지 파싱 (URL 빠른 등록)
     ├── week-history.js   # 주간 당첨 기록 규칙
     ├── roulette.js       # 캔버스 룰렛
     ├── voting.js         # 자유 투표 (참여 인원, 시간 제한, 1인 1표)
@@ -298,8 +284,7 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 
 ## 알려진 한계
 
-- **HTML 스크래핑**: URL 빠른 등록은 공식 API가 아니어서 네이버 페이지 구조가 바뀌면 깨질 수 있습니다.
-- **공개 CORS 프록시**: 느리거나 다운되거나 트래픽이 많으면 차단될 수 있습니다.
+- **주소 → 좌표 변환**: 네이버 Geocoder 는 주소만 인식합니다. 가게 이름이나 상호명으로는 좌표를 찾지 못합니다.
 - **동시 투표**: "최신 읽기 → 변경 → 쓰기" 방식이라 ETag 기반 낙관적 동시성이 아닙니다. 수십 ms 차이로 동시에 투표하거나 참여 인원을 바꾸면 한쪽 변경이 유실될 수 있으며, 다시 하면 됩니다.
 - **자동 룰렛**: 서버 없이 브라우저가 실행하므로 11:00 ~ 13:00 사이에 아무도 접속하지 않으면 그날 점심 룰렛은 돌지 않습니다.
 

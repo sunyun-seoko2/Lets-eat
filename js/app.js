@@ -1174,68 +1174,29 @@
     });
   }
 
-  // ---------- 공통: URL로 가게 등록 ----------
+  // ---------- 공통: 주소로 가게 등록 ----------
   /**
-   * URL(필수가 아님) + 이름(선택)으로 가게 등록.
+   * 이름 + 주소로 가게 등록. 주소는 네이버 지도 SDK Geocoder 로 좌표 변환.
    * statusCb(kind, msg): 'success' | 'warn' | 'error' | '' (info)
    * 반환: { store, warnNoCoords }
    */
-  async function registerStoreSmart({ meal, url, manualName, memo, statusCb }) {
+  async function registerStoreByAddress({ meal, name, address, memo, statusCb }) {
     const setStatus = (kind, msg) => { if (statusCb) statusCb(kind, msg); };
 
-    let name = (manualName || '').trim() || null;
-    let placeId = null;
-    let lat = null, lng = null, address = null, phone = null, category = null;
-
-    if (url) {
-      setStatus('', '🔍 URL 분석 중…');
-      const parsed = Maps.parseUrl(url);
-      if (parsed) {
-        if (!name && parsed.name) name = parsed.name;
-        placeId = parsed.placeId;
-        if (parsed.lat != null) { lat = parsed.lat; lng = parsed.lng; }
-      }
-    }
-
-    if (!name && !placeId) {
-      setStatus('error', '가게 이름이나 URL의 place ID를 찾을 수 없습니다.');
-      return null;
-    }
-
-    if (placeId && window.AppConfig && window.AppConfig.placeLookup && window.NaverApi) {
-      setStatus('', `🌐 네이버 지도에서 place ${placeId} 조회 중…`);
-      try {
-        const info = await NaverApi.getPlaceById(placeId);
-        if (info) {
-          if (info.name && !manualName) name = info.name;
-          if (info.address) address = info.address;
-          if (info.lat != null && info.lng != null) { lat = info.lat; lng = info.lng; }
-          if (info.phone) phone = info.phone;
-          if (info.category) category = info.category;
-        }
-      } catch (e) { console.warn('NaverApi lookup failed:', e); }
-    }
-
-    if ((lat == null || lng == null) && name) {
-      setStatus('', `🔍 "${name}" 좌표 검색 중…`);
-      const geo = await Maps.geocode(name);
-      if (geo) { lat = geo.lat; lng = geo.lng; if (!address) address = geo.address; }
-    }
-
+    setStatus('', `🔍 "${address}" 좌표 찾는 중…`);
+    const geo = await Maps.geocode(address);
+    const lat = geo ? geo.lat : null;
+    const lng = geo ? geo.lng : null;
     const warnNoCoords = (lat == null || lng == null);
-    const finalName = name || (placeId ? `장소 ${placeId}` : '이름 없음');
 
     let store;
     try {
       store = await Stores.add(meal, {
-        name: finalName,
-        url: url || '',
-        address: address || '',
+        name,
+        url: '',
+        address: (geo && geo.address) || address,
         lat, lng,
         memo: (memo || '').trim(),
-        placeId: placeId || null,
-        phone: phone || null,
-        category: category || null,
       });
     } catch (e) {
       setStatus('error', e && e.message ? e.message : '가게 등록 중 오류가 발생했습니다.');
@@ -1243,9 +1204,9 @@
     }
 
     if (warnNoCoords) {
-      setStatus('warn', `✓ "${finalName}" 등록됨. 좌표 자동 추출 실패 — 설정에서 "📍 지도에서 지정" 으로 위치를 잡아주세요.`);
+      setStatus('warn', `✓ "${name}" 등록됨. 주소로 좌표를 찾지 못했어요 — 지도에서 위치를 클릭해 지정해주세요.`);
     } else {
-      setStatus('success', `✅ "${finalName}" 등록 완료. (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+      setStatus('success', `✅ "${name}" 등록 완료. (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
     }
 
     return { store, warnNoCoords };
@@ -1261,11 +1222,11 @@
     if (el) el.textContent = '새 가게는 점심에 등록됩니다. 금요일 점심에도 쓰려면 아래 목록의 "중복 허용"에서 선택하세요.';
   }
 
-  // ---------- Settings: Auto-add (URL 폼) ----------
+  // ---------- Settings: Auto-add (주소 폼) ----------
   function bindAutoAdd() {
     $('#btn-auto-add').addEventListener('click', async () => {
-      const manualName = $('#reg-name').value.trim();
-      const url = $('#reg-url').value.trim();
+      const name = $('#reg-name').value.trim();
+      const address = $('#reg-address').value.trim();
       const memo = $('#reg-memo').value.trim();
       const meal = getRegisterMeal();
       const statusEl = $('#auto-add-status');
@@ -1275,20 +1236,20 @@
         statusEl.textContent = msg;
       };
 
-      if (!manualName) {
+      if (!name) {
         setStatus('error', '가게 이름을 입력해주세요.');
         return;
       }
-      if (!url) {
-        setStatus('error', 'URL을 입력해주세요.');
+      if (!address) {
+        setStatus('error', '주소를 입력해주세요.');
         return;
       }
 
-      const result = await registerStoreSmart({ meal, url, manualName, memo, statusCb: setStatus });
+      const result = await registerStoreByAddress({ meal, name, address, memo, statusCb: setStatus });
       if (!result) return;
 
       $('#reg-name').value = '';
-      $('#reg-url').value = '';
+      $('#reg-address').value = '';
       $('#reg-memo').value = '';
       renderSettingsStoreList();
       if (result.warnNoCoords) beginPickMode(result.store.id, meal);
