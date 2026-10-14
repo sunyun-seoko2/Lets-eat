@@ -82,6 +82,7 @@ Azure Table Storage 를 저장소로 쓰면 여러 사람이 같은 화면을 �
   - 지도 중심이 회사와 가게의 정가운데로 옮겨지고, 당첨 가게의 말풍선(상세 정보)이 열린 상태로 나옵니다. 말풍선을 닫으면 다시 열리지 않습니다.
   - 지도 아래에 *회사 → 가게 · 도보 약 N분 (약 Xm, 직선 Ym)* 문구가 함께 나옵니다.
   - 실제 길을 따라가는 경로가 아니라 **직선거리 × 1.3 (우회 보정)** 을 평균 보행 속도 4.5km/h로 나눈 **예상값** 입니다. 네이버 지도 API는 도보 길찾기를 제공하지 않습니다.
+  - 회사 좌표는 `37.5718135, 127.0010162` (네이버 Geocoder 로 `종로33길 15` 를 변환한 값) 이며, 서버(Azure Functions)도 같은 상수를 씁니다.
   - 룰렛이 도는 동안에는 결과가 미리 보이지 않도록 숨기고, 좌표가 없는 가게는 안내 문구만 표시합니다.
 - 📍 내 위치로 이동
 
@@ -262,7 +263,7 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 
 - 브라우저의 `maybeRunAutoRoulette` 와 **같은 로직** (시드 난수, 후보 5곳, 이번 주 당첨 제외, 입맛 보호, 인원 고정)으로 후보와 당첨을 정해 `votes` 테이블에 세션을 저장하고, 당첨 기록 · 이전 룰렛 기록도 남깁니다.
 - 회전 시작 시각은 저장 시각 + 약 5~10초라서, 폴링 중인 브라우저가 놓치지 않고 같이 회전합니다.
-- 회전이 끝난 뒤(+1초) **Teams 채널에 결과 카드**(당첨 가게 · 주소 · 도보 시간 · 메모 · 후보 · 지도 링크)를 게시합니다.
+- 회전이 끝난 뒤(+1초) **Teams 채널에 결과 카드**를 게시합니다. 카드 구성은 위에서부터 배너 이미지 · 가운데 정렬 굵은 제목(`2026년 10월 15일 목요일 점심 룰렛 결과`) · 당첨 가게 · 도보 시간/주소/메모 · 링크(네이버 지도에서 보기 · 밥먹자 열기) 이며, 버튼 대신 밑줄 텍스트 링크를 씁니다. 후보 목록은 넣지 않습니다.
 - 그날 이미 룰렛이 실행됐다면(브라우저 폴백 포함) 아무것도 하지 않습니다. 후보가 2곳 미만이면 안내 카드만 게시합니다.
 - **Flex Consumption(Linux, Node.js)** 플랜의 Function App 을 쓰며, 앱과 **같은 Storage Account** 의 테이블을 사용합니다. 현재 Function App 은 `lets-eat-function-app` (리소스 그룹 `lets-eat-rg`) 입니다.
 - 스케줄은 UTC 기준 `0 0 2 * * 1-5` (= 서울 11:00, 월~금). Linux Flex 는 `WEBSITE_TIME_ZONE` 을 지원하지 않아 UTC 로 표기합니다.
@@ -274,7 +275,8 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 | `STORAGE_ACCOUNT` | Storage Account 이름 (`js/config.js` 의 `azure.account` 와 같은 값) |
 | `STORAGE_SAS` | SAS 토큰 (`js/config.js` 의 `azure.sas` 와 같은 값, 앞의 `?` 는 있어도 없어도 됨) |
 | `TEAMS_WEBHOOK_URL` | Teams 워크플로 웹후크 URL (없으면 Teams 알림만 건너뜀) |
-| `APP_URL` | 카드의 "밥먹자 열기" 버튼 주소 (예: `https://sunyun-seoko2.github.io/Lets-eat/`) |
+| `APP_URL` | 카드의 "밥먹자 열기" 링크 주소 (예: `https://sunyun-seoko2.github.io/Lets-eat/`) |
+| `TEAMS_BANNER_URL` | (선택) 카드 상단 배너 이미지 주소. 기본값은 GitHub Pages 의 `assets/teams-banner.jpg`. 외부에서 열리는 공개 https 주소여야 하고, PNG/JPG 를 권장합니다 (Teams 는 WebP 를 안정적으로 표시하지 못함) |
 | `ROULETTE_SPIN_LEAD_MS` | 저장 후 회전 시작까지 대기 (기본 `5000`) |
 | `ROULETTE_SPIN_DURATION_MS` | 회전 시간 (기본 `8000`) |
 
@@ -345,7 +347,7 @@ Azure Portal → Function App → **함수 → lunchRoulette → 테스트/실�
 .
 ├── index.html            # 화면 구조 + 스크립트 로드
 ├── styles.css            # 전체 스타일 (라이트/다크 테마)
-├── assets/               # 헤더 · 탭 장식 이미지
+├── assets/               # 헤더 · 탭 장식 이미지, teams-banner.jpg (Teams 카드 배너)
 ├── functions/            # Azure Functions (서버 자동 룰렛 + Teams 알림)
 │   ├── host.json
 │   ├── package.json

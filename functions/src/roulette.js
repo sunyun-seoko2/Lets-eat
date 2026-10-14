@@ -311,7 +311,8 @@ function pickRandomFromVisible(n, meal, random, { storesByMeal, history, peopleS
 }
 
 // ---------- 도보 (maps.js) ----------
-const FIXED_LOCATION = { name: '연강빌딩', lat: 37.5705075, lng: 126.9924185 };
+// 네이버 Geocoder 로 '종로33길 15'(두산아트센터)를 변환한 값, 브라우저 보정 결과와 동일
+const FIXED_LOCATION = { name: '연강빌딩', lat: 37.5718135, lng: 127.0010162 };
 const WALK_DETOUR_FACTOR = 1.3;
 const WALK_METERS_PER_MINUTE = 75;
 

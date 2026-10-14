@@ -28,8 +28,8 @@
     roadAddress: '서울 종로구 종로33길 15',
     jibunAddress: '서울 종로구 연지동 270',
     address: '서울 종로구 종로33길 15',
-    lat: 37.5705075,
-    lng: 126.9924185,
+    lat: 37.5718135,
+    lng: 127.0010162,
     resolved: false,
   };
   const DEFAULT_CENTER = { lat: FIXED_LOCATION.lat, lng: FIXED_LOCATION.lng };

@@ -187,7 +187,6 @@ async function runLunchRoulette(timer, context) {
     winnerName: winner.name,
     store: winnerStore,
     walk,
-    candidateNames: items.map((it) => it.name),
   }), context);
 }
 

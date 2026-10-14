@@ -2,56 +2,11 @@
  * Teams Workflows 웹후크로 Adaptive Card 전송.
  * TEAMS_WEBHOOK_URL 은 Function 앱 설정에만 둔다 (클라이언트 코드/저장소에 넣지 말 것).
  */
-const KO_WEEKDAYS = { Sun: '일', Mon: '월', Tue: '화', Wed: '수', Thu: '목', Fri: '금', Sat: '토' };
+const KO_WEEKDAYS = { Sun: '일요일', Mon: '월요일', Tue: '화요일', Wed: '수요일', Thu: '목요일', Fri: '금요일', Sat: '토요일' };
+const DEFAULT_BANNER_URL = 'https://sunyun-seoko2.github.io/Lets-eat/assets/teams-banner.jpg';
 
 function formatMeters(m) {
   return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
-}
-
-function headerText(parts, meal) {
-  const p2 = (n) => String(n).padStart(2, '0');
-  const date = `${parts.year}. ${p2(parts.month)}. ${p2(parts.day)}.(${KO_WEEKDAYS[parts.weekday] || ''})`;
-  return `🎯 오늘의 ${meal === 'fridayLunch' ? '금요일 점심' : '점심'} 룰렛 · ${date}`;
-}
-
-function headerBlock(parts, meal) {
-  return {
-    type: 'TextBlock',
-    text: headerText(parts, meal),
-    size: 'Small',
-    isSubtle: true,
-    wrap: true,
-  };
-}
-
-function buildCard({ parts, meal, winnerName, store, walk, candidateNames }) {
-  const facts = [];
-  if (store && store.address) facts.push({ title: '주소', value: String(store.address) });
-  if (walk) facts.push({ title: '도보', value: `약 ${walk.minutes}분 (약 ${formatMeters(walk.walkM)})` });
-  if (store && store.memo) facts.push({ title: '메모', value: String(store.memo) });
-  if (candidateNames && candidateNames.length) facts.push({ title: '후보', value: candidateNames.join(' · ') });
-
-  const body = [
-    headerBlock(parts, meal),
-    {
-      type: 'TextBlock',
-      text: String(winnerName || ''),
-      size: 'Large',
-      weight: 'Bolder',
-      color: 'Accent',
-      wrap: true,
-    },
-  ];
-  if (facts.length) body.push({ type: 'FactSet', facts });
-
-  const actions = [];
-  if (store && isHttpUrl(store.url)) {
-    actions.push({ type: 'Action.OpenUrl', title: '네이버 지도에서 보기', url: String(store.url).trim() });
-  }
-  if (isHttpUrl(process.env.APP_URL)) {
-    actions.push({ type: 'Action.OpenUrl', title: '밥먹자 열기', url: process.env.APP_URL.trim() });
-  }
-  return wrapCard(body, actions);
 }
 
 function isHttpUrl(value) {
@@ -63,25 +18,102 @@ function isHttpUrl(value) {
   }
 }
 
-function buildInsufficientCard({ parts, meal, note }) {
-  return wrapCard([
-    headerBlock(parts, meal),
-    { type: 'TextBlock', text: String(note || ''), wrap: true },
-  ], isHttpUrl(process.env.APP_URL)
-    ? [{ type: 'Action.OpenUrl', title: '밥먹자 열기', url: process.env.APP_URL.trim() }]
-    : []);
+/** 마크다운 링크로 쓸 수 있는 URL 이면 trim 한 값, 아니면 null (공백/')' 포함 시 제외) */
+function linkUrl(value) {
+  if (!isHttpUrl(value)) return null;
+  const s = String(value).trim();
+  return /[\s)]/.test(s) ? null : s;
 }
 
-function wrapCard(body, actions) {
-  const content = {
+function titleText(parts) {
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 ${KO_WEEKDAYS[parts.weekday] || ''} 점심 룰렛 결과`;
+}
+
+function bannerBlock() {
+  const url = String(process.env.TEAMS_BANNER_URL || DEFAULT_BANNER_URL).trim();
+  if (!isHttpUrl(url)) return null;
+  return { type: 'Image', url, size: 'Stretch', altText: '밥먹자 배너' };
+}
+
+function titleBlock(parts) {
+  return {
+    type: 'TextBlock',
+    text: titleText(parts),
+    horizontalAlignment: 'Center',
+    weight: 'Bolder',
+    wrap: true,
+    spacing: 'Medium',
+  };
+}
+
+function linksBlock(links) {
+  const items = links.filter(Boolean);
+  if (!items.length) return null;
+  return {
+    type: 'TextBlock',
+    text: items.join('  ·  '),
+    horizontalAlignment: 'Center',
+    wrap: true,
+    spacing: 'Medium',
+  };
+}
+
+function appLink() {
+  const u = linkUrl(process.env.APP_URL);
+  return u ? `[밥먹자 열기](${u})` : null;
+}
+
+function buildCard({ parts, winnerName, store, walk }) {
+  const info = [];
+  if (walk) info.push(`🚶 도보 약 ${walk.minutes}분 (약 ${formatMeters(walk.walkM)})`);
+  if (store && store.address) info.push(`📍 ${store.address}`);
+  if (store && store.memo) info.push(`📝 ${store.memo}`);
+
+  const storeUrl = store ? linkUrl(store.url) : null;
+  const body = [
+    bannerBlock(),
+    titleBlock(parts),
+    {
+      type: 'TextBlock',
+      text: `🎯 ${winnerName || ''}`,
+      horizontalAlignment: 'Center',
+      size: 'ExtraLarge',
+      weight: 'Bolder',
+      color: 'Accent',
+      wrap: true,
+    },
+  ];
+  if (info.length) {
+    body.push({
+      type: 'TextBlock',
+      text: info.join(' · '),
+      horizontalAlignment: 'Center',
+      isSubtle: true,
+      wrap: true,
+      spacing: 'Small',
+    });
+  }
+  body.push(linksBlock([storeUrl ? `[네이버 지도에서 보기](${storeUrl})` : null, appLink()]));
+  return wrapCard(body);
+}
+
+function buildInsufficientCard({ parts, note }) {
+  return wrapCard([
+    bannerBlock(),
+    titleBlock(parts),
+    { type: 'TextBlock', text: String(note || ''), horizontalAlignment: 'Center', wrap: true, spacing: 'Medium' },
+    linksBlock([appLink()]),
+  ]);
+}
+
+function wrapCard(body) {
+  return {
     $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
     type: 'AdaptiveCard',
     version: '1.4',
     msteams: { width: 'Full' },
-    body,
+    body: body.filter(Boolean),
   };
-  if (actions.length) content.actions = actions;
-  return content;
 }
 
 /** 실패 시 예외를 던지지 않고 false 반환 (로그는 context.error) */
