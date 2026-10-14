@@ -186,7 +186,6 @@ async function runLunchRoulette(timer, context) {
     meal,
     winnerName: winner.name,
     store: winnerStore,
-    walk,
   }), context);
 }
 

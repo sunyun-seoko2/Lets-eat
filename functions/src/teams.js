@@ -5,10 +5,6 @@
 const KO_WEEKDAYS = { Sun: '일요일', Mon: '월요일', Tue: '화요일', Wed: '수요일', Thu: '목요일', Fri: '금요일', Sat: '토요일' };
 const DEFAULT_BANNER_URL = 'https://sunyun-seoko2.github.io/Lets-eat/assets/teams-banner.jpg';
 
-function formatMeters(m) {
-  return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
-}
-
 function isHttpUrl(value) {
   try {
     const u = new URL(String(value || '').trim());
@@ -18,11 +14,11 @@ function isHttpUrl(value) {
   }
 }
 
-/** 마크다운 링크로 쓸 수 있는 URL 이면 trim 한 값, 아니면 null (공백/')' 포함 시 제외) */
+/** 마크다운 링크로 쓸 수 있는 URL 이면 trim 한 값, 아니면 null (공백/괄호 포함 시 제외) */
 function linkUrl(value) {
   if (!isHttpUrl(value)) return null;
   const s = String(value).trim();
-  return /[\s)]/.test(s) ? null : s;
+  return /[\s()]/.test(s) ? null : s;
 }
 
 function titleText(parts) {
@@ -46,55 +42,25 @@ function titleBlock(parts) {
   };
 }
 
-function linksBlock(links) {
-  const items = links.filter(Boolean);
-  if (!items.length) return null;
-  return {
-    type: 'TextBlock',
-    text: items.join('  ·  '),
-    horizontalAlignment: 'Center',
-    wrap: true,
-    spacing: 'Medium',
-  };
-}
-
-function appLink() {
-  const u = linkUrl(process.env.APP_URL);
-  return u ? `[밥먹자 열기](${u})` : null;
-}
-
-function buildCard({ parts, winnerName, store, walk }) {
-  const info = [];
-  if (walk) info.push(`🚶 도보 약 ${walk.minutes}분 (약 ${formatMeters(walk.walkM)})`);
-  if (store && store.address) info.push(`📍 ${store.address}`);
-  if (store && store.memo) info.push(`📝 ${store.memo}`);
-
+function buildCard({ parts, winnerName, store }) {
+  const name = winnerName || '';
   const storeUrl = store ? linkUrl(store.url) : null;
-  const body = [
+  const text = storeUrl
+    ? `🗺️ [${name.replace(/[\[\]]/g, '\\$&')}](${storeUrl})`
+    : `🗺️ ${name}`;
+  return wrapCard([
     bannerBlock(),
     titleBlock(parts),
     {
       type: 'TextBlock',
-      text: `🎯 ${winnerName || ''}`,
+      text,
       horizontalAlignment: 'Center',
       size: 'ExtraLarge',
       weight: 'Bolder',
       color: 'Accent',
       wrap: true,
     },
-  ];
-  if (info.length) {
-    body.push({
-      type: 'TextBlock',
-      text: info.join(' · '),
-      horizontalAlignment: 'Center',
-      isSubtle: true,
-      wrap: true,
-      spacing: 'Small',
-    });
-  }
-  body.push(linksBlock([storeUrl ? `[네이버 지도에서 보기](${storeUrl})` : null, appLink()]));
-  return wrapCard(body);
+  ]);
 }
 
 function buildInsufficientCard({ parts, note }) {
@@ -102,7 +68,6 @@ function buildInsufficientCard({ parts, note }) {
     bannerBlock(),
     titleBlock(parts),
     { type: 'TextBlock', text: String(note || ''), horizontalAlignment: 'Center', wrap: true, spacing: 'Medium' },
-    linksBlock([appLink()]),
   ]);
 }
 
@@ -111,7 +76,6 @@ function wrapCard(body) {
     $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
     type: 'AdaptiveCard',
     version: '1.4',
-    msteams: { width: 'Full' },
     body: body.filter(Boolean),
   };
 }
