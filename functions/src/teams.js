@@ -37,6 +37,7 @@ function titleBlock(parts) {
     text: titleText(parts),
     horizontalAlignment: 'Center',
     weight: 'Bolder',
+    color: 'Good',
     wrap: true,
     spacing: 'Medium',
   };
@@ -50,10 +51,11 @@ function buildCard({ parts, winnerName, store }) {
     titleBlock(parts),
     {
       type: 'TextBlock',
-      text: `🗺️ ${name}`,
+      text: `🎯 ${name} 🎯`,
       horizontalAlignment: 'Center',
       size: 'ExtraLarge',
       weight: 'Bolder',
+      color: 'Accent',
       wrap: true,
     },
     // Teams 는 ActionSet 버튼을 왼쪽에 붙이므로, 좌우 빈 칸(stretch) 사이에 두어 가운데 정렬
