@@ -32,7 +32,7 @@ function titleText(parts) {
 function bannerBlock() {
   const url = String(process.env.TEAMS_BANNER_URL || DEFAULT_BANNER_URL).trim();
   if (!isHttpUrl(url)) return null;
-  return { type: 'Image', url, size: 'Stretch', altText: '밥먹자 배너' };
+  return { type: 'Image', url, width: '360px', height: '180px', horizontalAlignment: 'Center', altText: '밥먹자 배너' };
 }
 
 function titleBlock(parts) {
