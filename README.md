@@ -293,14 +293,15 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 
 ### 배포
 
-저장소 루트에서 실행합니다. Windows 10+ 의 `tar`(bsdtar)는 경로를 슬래시(`/`)로 기록하므로 Git Bash 와 PowerShell 모두에서 쓸 수 있습니다.
+저장소 루트의 **PowerShell** 에서 실행합니다. Windows 10+ 기본 `tar.exe`(bsdtar)는 zip 을 만들고 경로를 슬래시(`/`)로 기록합니다.
 
-```bash
-tar -a -c -f functions.zip -C functions host.json package.json src
+```powershell
+tar.exe -a -c -f functions.zip -C functions host.json package.json src
 ```
 
 > [!WARNING]
-> PowerShell 5.1 의 `Compress-Archive` 는 zip 안의 경로를 역슬래시(`\`)로 기록해 Linux(Flex Consumption)에서 배포가 깨집니다. 쓰지 마세요.
+> - **Git Bash 의 `tar` 는 GNU tar** 라서 `-a` 를 줘도 zip 이 아닌 tar 파일이 만들어지고, 배포가 `End of Central Directory record could not be found` 로 실패합니다. Git Bash 에서는 `/c/Windows/System32/tar.exe` 로 전체 경로를 쓰세요.
+> - PowerShell 5.1 의 `Compress-Archive` 는 zip 안의 경로를 역슬래시(`\`)로 기록해 Linux(Flex Consumption)에서 배포가 깨집니다. 쓰지 마세요.
 
 ```bash
 az functionapp deployment source config-zip -g lets-eat-rg -n lets-eat-function-app --src functions.zip --build-remote true
