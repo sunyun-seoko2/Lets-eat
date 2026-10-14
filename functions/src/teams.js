@@ -14,11 +14,11 @@ function isHttpUrl(value) {
   }
 }
 
-/** 마크다운 링크로 쓸 수 있는 URL 이면 trim 한 값, 아니면 null (공백/괄호 포함 시 제외) */
+/** 버튼 링크로 쓸 수 있는 URL(http/https, 공백 없음)이면 trim 한 값, 아니면 null */
 function linkUrl(value) {
   if (!isHttpUrl(value)) return null;
   const s = String(value).trim();
-  return /[\s()]/.test(s) ? null : s;
+  return /\s/.test(s) ? null : s;
 }
 
 function titleText(parts) {
@@ -28,7 +28,7 @@ function titleText(parts) {
 function bannerBlock() {
   const url = String(process.env.TEAMS_BANNER_URL || DEFAULT_BANNER_URL).trim();
   if (!isHttpUrl(url)) return null;
-  return { type: 'Image', url, width: '360px', height: '180px', horizontalAlignment: 'Center', altText: '밥먹자 배너' };
+  return { type: 'Image', url, size: 'Stretch', altText: '밥먹자 배너' };
 }
 
 function titleBlock(parts) {
@@ -45,21 +45,34 @@ function titleBlock(parts) {
 function buildCard({ parts, winnerName, store }) {
   const name = winnerName || '';
   const storeUrl = store ? linkUrl(store.url) : null;
-  const text = storeUrl
-    ? `🗺️ [${name.replace(/[\[\]]/g, '\\$&')}](${storeUrl})`
-    : `🗺️ ${name}`;
   return wrapCard([
     bannerBlock(),
     titleBlock(parts),
     {
       type: 'TextBlock',
-      text,
+      text: `🗺️ ${name}`,
       horizontalAlignment: 'Center',
       size: 'ExtraLarge',
       weight: 'Bolder',
-      color: 'Accent',
       wrap: true,
     },
+    // Teams 는 ActionSet 버튼을 왼쪽에 붙이므로, 좌우 빈 칸(stretch) 사이에 두어 가운데 정렬
+    storeUrl ? {
+      type: 'ColumnSet',
+      spacing: 'Medium',
+      columns: [
+        { type: 'Column', width: 'stretch', items: [] },
+        {
+          type: 'Column',
+          width: 'auto',
+          items: [{
+            type: 'ActionSet',
+            actions: [{ type: 'Action.OpenUrl', title: '네이버 지도에서 보기', url: storeUrl, style: 'positive' }],
+          }],
+        },
+        { type: 'Column', width: 'stretch', items: [] },
+      ],
+    } : null,
   ]);
 }
 
