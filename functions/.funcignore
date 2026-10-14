@@ -1,0 +1,8 @@
+local.settings.json
+local.settings.example.json
+.vscode
+.git
+.gitignore
+*.md
+*.zip
+test

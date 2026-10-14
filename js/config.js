@@ -34,5 +34,7 @@ window.AppConfig = {
   rouletteSpinLeadMs: 2000,    // 다른 사용자 브라우저가 회전 시작 전에 세션을 받을 시간
   rouletteSpinDurationMs: 8000,
 
+  serverAutoRoulette: true,    // 11:00 룰렛은 Azure Functions 가 실행. 브라우저는 서버가 실패했을 때만 11:03부터 대신 실행
+
   showDinnerTab: false,        // 저녁 탭을 다시 쓰려면 true 로 변경
 };

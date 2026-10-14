@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "STORAGE_ACCOUNT": "<storage-account-name>",
+    "STORAGE_SAS": "<sas-token (js/config.js 의 azure.sas 와 같은 값)>",
+    "TEAMS_WEBHOOK_URL": "<Teams 워크플로 웹후크 URL>",
+    "APP_URL": "https://sunyun-seoko2.github.io/Lets-eat/",
+    "ROULETTE_SPIN_LEAD_MS": "5000",
+    "ROULETTE_SPIN_DURATION_MS": "8000"
+  }
+}

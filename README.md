@@ -23,6 +23,7 @@
 - [설정](#설정)
 - [배포 (GitHub Pages)](#배포-github-pages)
 - [데이터 저장](#데이터-저장)
+- [서버 자동 룰렛 (Azure Functions) · Teams 알림](#서버-자동-룰렛-azure-functions--teams-알림)
 - [시간 규칙](#시간-규칙)
 - [프로젝트 구조](#프로젝트-구조)
 - [보안 주의](#보안-주의)
@@ -89,7 +90,9 @@ Azure Table Storage 를 저장소로 쓰면 여러 사람이 같은 화면을 �
 
 - **⏰ 평일 11:00 자동 실행**: 월~목은 *점심*, 금요일은 *금요일 점심* 가게 중 랜덤 5곳을 뽑아 룰렛을 돌립니다. 어느 요일이든 점심 탭에서 보입니다.
   - 이번 주 당첨 가게와 입맛 보호 대상자가 못 가는 가게는 후보에서 빠집니다.
-  - 11:00에 아무도 접속해 있지 않았다면 13:00 전에 처음 접속한 사람의 화면에서 실행됩니다. 13:00이 지나면 그날은 건너뜁니다.
+  - 11:00 룰렛은 **Azure Functions 가 서버에서 실행** 하므로 아무도 페이지를 열어 두지 않아도 됩니다. 브라우저는 저장된 결과를 받아 회전만 재생합니다.
+  - 회전이 끝나면 결과 카드가 **Teams 채널** 에 게시됩니다. ([서버 자동 룰렛](#서버-자동-룰렛-azure-functions--teams-알림) 참고)
+  - 서버가 실패했을 때만, 11:03 이후 13:00 전에 처음 접속한 사람의 화면에서 예전처럼 대신 실행합니다. 13:00이 지나면 그날은 건너뜁니다.
 - 모든 접속자의 화면에서 **같은 룰렛이 동시에** 회전
 - 하루 1회 — 결과는 다음날 09:00에 자동으로 지워집니다.
 - 🕘 **이전 룰렛 기록** 팝업: 최근 **15개** 까지 보관하며, 16번째부터는 가장 오래된 기록이 지워집니다.
@@ -98,7 +101,7 @@ Azure Table Storage 를 저장소로 쓰면 여러 사람이 같은 화면을 �
 - 주말과 저녁에는 룰렛을 쓰지 않습니다.
 
 > [!NOTE]
-> 서버가 없는 앱이라 **11:00에 누군가 페이지를 열어 두고 있어야** 정시에 돕니다. 여러 명이 열어 두어도 같은 날짜로 계산한 후보·당첨이 같아서 결과는 하나로 맞춰집니다. 브라우저가 백그라운드 탭의 타이머를 늦추면 최대 1분쯤 늦게 시작할 수 있습니다.
+> 서버 실행이 실패한 경우의 브라우저 폴백(11:03~)은 누군가 페이지를 열어 두고 있어야 동작합니다. 서버와 브라우저, 여러 브라우저가 동시에 실행해도 같은 날짜로 계산한 후보·당첨이 같아서 결과는 하나로 맞춰집니다. 브라우저가 백그라운드 탭의 타이머를 늦추면 최대 1분쯤 늦게 시작할 수 있습니다.
 
 ### 🗳️ 자유 투표
 식사와 별개로 쓰는 일반 투표입니다. 음료수 내기, 회식 날짜 정하기 등 무엇이든 물어볼 수 있습니다. 모든 탭에서 같은 투표 하나가 보입니다.
@@ -162,6 +165,7 @@ npx http-server -p 8000
 | `pollIntervalRouletteMs` | `1000` | 룰렛 회전 중 폴링 간격 (ms) |
 | `rouletteSpinLeadMs` | `2000` | 다른 브라우저가 회전을 받을 수 있도록 시작 전 대기 (ms) |
 | `rouletteSpinDurationMs` | `8000` | 룰렛 회전 시간 (ms) |
+| `serverAutoRoulette` | `true` | `true` = 11:00 룰렛을 Azure Functions 가 실행하고, 브라우저 폴백은 11:03부터 동작 (`false` = 예전처럼 11:00부터 브라우저가 실행) |
 | `showDinnerTab` | `false` | 저녁 탭과 설정 메뉴의 저녁 선택지 표시 여부 (끄면 화면에서만 숨김) |
 
 ### 네이버 지도 API 키
@@ -252,6 +256,72 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 - 룰렛은 2초 뒤 시작해 8초간 회전 → 다른 브라우저도 같은 회전을 재생
 - 탭이 백그라운드에 있으면 폴링 일시 중단
 
+## 서버 자동 룰렛 (Azure Functions) · Teams 알림
+
+평일 11:00(서울)에 [`functions/`](functions) 의 `lunchRoulette` 함수가 룰렛을 실행합니다.
+
+- 브라우저의 `maybeRunAutoRoulette` 와 **같은 로직** (시드 난수, 후보 5곳, 이번 주 당첨 제외, 입맛 보호, 인원 고정)으로 후보와 당첨을 정해 `votes` 테이블에 세션을 저장하고, 당첨 기록 · 이전 룰렛 기록도 남깁니다.
+- 회전 시작 시각은 저장 시각 + 약 5~10초라서, 폴링 중인 브라우저가 놓치지 않고 같이 회전합니다.
+- 회전이 끝난 뒤(+1초) **Teams 채널에 결과 카드**(당첨 가게 · 주소 · 도보 시간 · 메모 · 후보 · 지도 링크)를 게시합니다.
+- 그날 이미 룰렛이 실행됐다면(브라우저 폴백 포함) 아무것도 하지 않습니다. 후보가 2곳 미만이면 안내 카드만 게시합니다.
+- **Flex Consumption(Linux, Node.js)** 플랜의 Function App 을 쓰며, 앱과 **같은 Storage Account** 의 테이블을 사용합니다. 현재 Function App 은 `lets-eat-function-app` (리소스 그룹 `lets-eat-rg`) 입니다.
+- 스케줄은 UTC 기준 `0 0 2 * * 1-5` (= 서울 11:00, 월~금). Linux Flex 는 `WEBSITE_TIME_ZONE` 을 지원하지 않아 UTC 로 표기합니다.
+
+### 앱 설정 (Function App → Environment variables)
+
+| 이름 | 설명 |
+|---|---|
+| `STORAGE_ACCOUNT` | Storage Account 이름 (`js/config.js` 의 `azure.account` 와 같은 값) |
+| `STORAGE_SAS` | SAS 토큰 (`js/config.js` 의 `azure.sas` 와 같은 값, 앞의 `?` 는 있어도 없어도 됨) |
+| `TEAMS_WEBHOOK_URL` | Teams 워크플로 웹후크 URL (없으면 Teams 알림만 건너뜀) |
+| `APP_URL` | 카드의 "밥먹자 열기" 버튼 주소 (예: `https://sunyun-seoko2.github.io/Lets-eat/`) |
+| `ROULETTE_SPIN_LEAD_MS` | 저장 후 회전 시작까지 대기 (기본 `5000`) |
+| `ROULETTE_SPIN_DURATION_MS` | 회전 시간 (기본 `8000`) |
+
+> 테이블 이름을 바꿨다면 `TABLE_STORES` · `TABLE_VOTES` · `TABLE_PEOPLE` · `TABLE_RANDOM_HISTORY` 로 지정할 수 있습니다.
+> 로컬 테스트용 설정은 `functions/local.settings.example.json` 을 `local.settings.json` 으로 복사해 채웁니다. 타이머 트리거 때문에 `AzureWebJobsStorage` 가 필요하므로 로컬 실행 시에는 [Azurite](https://learn.microsoft.com/azure/storage/common/storage-use-azurite) 에뮬레이터(`UseDevelopmentStorage=true`)를 먼저 켜 두세요.
+
+### Teams 설정
+
+1. Teams 채널 → **⋯ → 워크플로** (Workflows)
+2. **"웹후크 요청이 수신되면 채널에 게시"** 템플릿 선택 후 만들기
+3. 만들어진 **웹후크 URL 을 복사**
+4. Function App 의 `TEAMS_WEBHOOK_URL` 앱 설정에 붙여넣기
+
+> [!NOTE]
+> 웹후크가 `202` 를 돌려줘도 "요청을 접수했다"는 뜻일 뿐입니다. 실제 게시 실패는 Teams / Power Automate 의 해당 워크플로 **실행 기록(run history)** 에서 확인하세요.
+
+### 배포
+
+저장소 루트에서 실행합니다. Windows 10+ 의 `tar`(bsdtar)는 경로를 슬래시(`/`)로 기록하므로 Git Bash 와 PowerShell 모두에서 쓸 수 있습니다.
+
+```bash
+tar -a -c -f functions.zip -C functions host.json package.json src
+```
+
+> [!WARNING]
+> PowerShell 5.1 의 `Compress-Archive` 는 zip 안의 경로를 역슬래시(`\`)로 기록해 Linux(Flex Consumption)에서 배포가 깨집니다. 쓰지 마세요.
+
+```bash
+az functionapp deployment source config-zip -g lets-eat-rg -n lets-eat-function-app --src functions.zip --build-remote true
+```
+
+앱 설정 등록:
+
+```bash
+az functionapp config appsettings set -g lets-eat-rg -n lets-eat-function-app --settings \
+  STORAGE_ACCOUNT=<STORAGE_ACCOUNT> STORAGE_SAS="<SAS>" \
+  TEAMS_WEBHOOK_URL="<WEBHOOK_URL>" APP_URL=https://sunyun-seoko2.github.io/Lets-eat/ \
+  ROULETTE_SPIN_LEAD_MS=5000 ROULETTE_SPIN_DURATION_MS=8000
+```
+
+### 테스트
+
+Azure Portal → Function App → **함수 → lunchRoulette → 테스트/실행** 으로 수동 실행할 수 있습니다.
+
+> [!WARNING]
+> 평일에 오늘 룰렛이 아직 실행되지 않았다면 **실제로 룰렛이 실행** 되어 세션 · 기록이 저장되고 Teams 에도 게시됩니다. 이미 실행됐거나 주말이면 로그만 남기고 끝납니다. 로그는 Application Insights 또는 함수의 **모니터** 탭에서 확인합니다.
+
 ## 시간 규칙
 
 모든 시간은 **서울(Asia/Seoul)** 기준입니다.
@@ -260,7 +330,7 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 |---|---|
 | 금요일 점심 가게로 전환 | 금요일 하루 동안 (룰렛 · 지도) |
 | 자동 탭 선택 — 저녁 | 평일 13:30 ~ 19:00 (저녁 탭을 켰을 때만) |
-| 점심 룰렛 자동 실행 | 평일 11:00 (월~목 *점심*, 금 *금요일 점심*) · 13:00까지 미실행분 보충 |
+| 점심 룰렛 자동 실행 | 서버(Azure Functions) 평일 11:00 (월~목 *점심*, 금 *금요일 점심*) · 서버 실패 시 브라우저 폴백 11:03 ~ 13:00 |
 | 룰렛 자동 초기화 | 매일 09:00 |
 | 종료된 투표 자동 보관 | 종료 다음날 09:30 |
 | 인원 고정 적용 | 월~목 10:50 ~ 13:30 |
@@ -275,6 +345,15 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 ├── index.html            # 화면 구조 + 스크립트 로드
 ├── styles.css            # 전체 스타일 (라이트/다크 테마)
 ├── assets/               # 헤더 · 탭 장식 이미지
+├── functions/            # Azure Functions (서버 자동 룰렛 + Teams 알림)
+│   ├── host.json
+│   ├── package.json
+│   ├── local.settings.example.json
+│   └── src/
+│       ├── functions/lunchRoulette.js  # 평일 11:00 타이머 트리거
+│       ├── roulette.js   # 후보 선정 · 시드 난수 · 도보 계산 (app.js 포팅)
+│       ├── tables.js     # Azure Table REST 클라이언트
+│       └── teams.js      # Teams Adaptive Card 전송
 └── js/
     ├── config.js         # 앱 설정 (저장소, 프록시, 폴링 간격)
     ├── storage.js        # localStorage 어댑터
@@ -295,6 +374,7 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 - 사내 · 지인 그룹용 **비공개 페이지** 로만 운영하세요. 공개 저장소라면 토큰이 커밋 기록에 남습니다.
 - 토큰 만료일은 짧게 잡고 주기적으로 재발급하세요. 노출이 의심되면 즉시 **Storage Account 키를 교체** 해 기존 토큰을 무효화하세요.
 - 더 안전하게 운영하려면 Azure Function 등 경량 백엔드에서 토큰을 발급 · 검증하세요.
+- Teams **웹후크 URL** 은 Function 앱 설정(`TEAMS_WEBHOOK_URL`)에만 두고, 클라이언트 코드나 저장소에는 절대 넣지 마세요. URL 을 아는 사람은 누구나 채널에 글을 올릴 수 있습니다. (`functions/local.settings.json` 은 `.gitignore` 로 제외됩니다.)
 - 관리자 암호는 클라이언트 코드에 들어 있어 **실수 방지용** 일 뿐, 보안 장치가 아닙니다.
 - **Naver Maps Key ID** 는 도메인 인증으로 보호되므로 노출되어도 괜찮지만, **Client Secret** 은 절대 클라이언트 코드에 넣지 마세요.
 
@@ -302,7 +382,8 @@ Azure 모드에서는 서버 푸시 없이 **폴링** 으로 화면을 맞춥니
 
 - **주소 → 좌표 변환**: 네이버 Geocoder 는 주소만 인식합니다. 가게 이름이나 상호명으로는 좌표를 찾지 못합니다.
 - **동시 투표**: "최신 읽기 → 변경 → 쓰기" 방식이라 ETag 기반 낙관적 동시성이 아닙니다. 수십 ms 차이로 동시에 투표하거나 참여 인원을 바꾸면 한쪽 변경이 유실될 수 있으며, 다시 하면 됩니다.
-- **자동 룰렛**: 서버 없이 브라우저가 실행하므로 11:00 ~ 13:00 사이에 아무도 접속하지 않으면 그날 점심 룰렛은 돌지 않습니다.
+- **자동 룰렛**: 평소에는 서버(Azure Functions)가 실행합니다. 서버가 실패하면 브라우저 폴백이 필요한데, 11:03 ~ 13:00 사이에 아무도 접속하지 않으면 그날 점심 룰렛은 돌지 않습니다.
+- **공휴일**: 공휴일은 건너뛰지 않습니다. 평일이면 공휴일에도 룰렛이 돌고 Teams 알림이 갑니다.
 
 ## 라이선스
 

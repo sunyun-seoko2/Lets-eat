@@ -9,6 +9,7 @@
   const ROULETTE_DEFAULT_DURATION_MS = 8000;
   const ROULETTE_AUTO_START_MINUTES = 11 * 60; // 평일 11:00 점심 룰렛 자동 실행
   const ROULETTE_AUTO_END_MINUTES = 13 * 60;   // 13:00까지 아무도 접속하지 않았으면 그날은 건너뜀
+  const ROULETTE_SERVER_GRACE_MINUTES = 3;      // 서버 자동 룰렛 사용 시 브라우저 폴백은 11:03부터
   const ROULETTE_HISTORY_MAX = 15;              // 이전 룰렛 기록 최대 보관 개수
 
   const state = {
@@ -1679,7 +1680,9 @@
     const meal = getAutoRouletteMealToday(parts);
     if (!meal) return;
     const minutes = parts.hour * 60 + parts.minute;
-    if (minutes < ROULETTE_AUTO_START_MINUTES || minutes >= ROULETTE_AUTO_END_MINUTES) return;
+    const startMinutes = ROULETTE_AUTO_START_MINUTES
+      + (window.AppConfig && window.AppConfig.serverAutoRoulette ? ROULETTE_SERVER_GRACE_MINUTES : 0);
+    if (minutes < startMinutes || minutes >= ROULETTE_AUTO_END_MINUTES) return;
     const todayKey = parts.dateKey;
     if (hasAutoRouletteRunToday(state.rouletteByMeal[meal], todayKey)) return;
     if (autoRouletteBusy || Date.now() < autoRouletteRetryAt) return;

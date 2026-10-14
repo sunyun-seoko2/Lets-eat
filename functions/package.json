@@ -1,0 +1,17 @@
+{
+  "name": "lets-eat-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "밥먹자 서버 자동 룰렛 (Azure Functions) + Teams 알림",
+  "main": "src/functions/*.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
