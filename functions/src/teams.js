@@ -69,7 +69,7 @@ function buildCard({ parts, winnerName, store }) {
           width: 'auto',
           items: [{
             type: 'ActionSet',
-            actions: [{ type: 'Action.OpenUrl', title: '네이버 지도에서 보기', url: storeUrl, style: 'positive' }],
+            actions: [{ type: 'Action.OpenUrl', title: '네이버 지도 열기', url: storeUrl, style: 'positive' }],
           }],
         },
         { type: 'Column', width: 'stretch', items: [] },
