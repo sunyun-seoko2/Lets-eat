@@ -131,6 +131,10 @@ async function saveRandomHistory(meal, record) {
   await putEntity(TABLES.randomHistory(), meal, String(record.id), record);
 }
 
+async function deleteRandomHistory(meal, id) {
+  await deleteEntity(TABLES.randomHistory(), meal, String(id));
+}
+
 async function getPeopleBundle() {
   const payload = parsePayload(await getEntity(TABLES.people(), 'shared', 'current'));
   if (!payload || typeof payload !== 'object') {
@@ -148,5 +152,6 @@ module.exports = {
   deleteRouletteHistory,
   getRandomHistory,
   saveRandomHistory,
+  deleteRandomHistory,
   getPeopleBundle,
 };

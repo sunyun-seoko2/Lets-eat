@@ -54,7 +54,7 @@ async function prepareAndSave(context) {
   const blockHistory = histories.flat();
 
   const items = R.pickRandomFromVisible(5, meal, R.createSeededRandom(`${todayKey}:${meal}:pick`), {
-    storesByMeal, history: blockHistory, peopleState,
+    storesByMeal, history: blockHistory, peopleState, weekday: parts.weekday,
   }).map((s) => ({ id: s.id, name: s.name }));
   context.log(`후보 ${items.length}개: ${items.map((it) => it.name).join(', ')}`);
 
@@ -149,7 +149,7 @@ async function runLunchRoulette(timer, context) {
 
   try {
     const ref = `roulette:${id}`;
-    if (R.isWorkdayForRecording(Date.now()) && !history.some((r) => r.sourceRef === ref)) {
+    if (!history.some((r) => r.sourceRef === ref)) {
       await tables.saveRandomHistory(meal, {
         id: `rh_${id}`,
         storeId: winner.id,
@@ -158,6 +158,11 @@ async function runLunchRoulette(timer, context) {
         sourceRef: ref,
         createdAt: Date.now(),
       });
+    }
+    // 7일 지난 당첨 기록 정리 (직전 3업무일 제외에는 그 안쪽 기록만 쓰임)
+    const now = Date.now();
+    for (const row of await tables.getRandomHistory(meal)) {
+      if (row && row.id && R.isPrunableRecord(row, now)) await tables.deleteRandomHistory(meal, row.id);
     }
   } catch (e) {
     context.error('랜덤 기록 저장 실패:', e.message);

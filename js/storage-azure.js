@@ -346,21 +346,6 @@
       const safe = (bundle && typeof bundle === 'object') ? bundle : {};
       await putEntity(TABLE_PEOPLE, 'shared', 'current', { Payload: JSON.stringify(safe) });
     },
-
-    async getWeeklyResetAt() {
-      await ensureInit();
-      const e = await getEntity(TABLE_VOTES, '_meta', 'weekly_reset');
-      const payload = parsePayload(e);
-      const n = Number(payload && payload.at);
-      return Number.isFinite(n) ? n : 0;
-    },
-
-    async setWeeklyResetAt(ts) {
-      await ensureInit();
-      await putEntity(TABLE_VOTES, '_meta', 'weekly_reset', {
-        Payload: JSON.stringify({ at: Number(ts) || 0 }),
-      });
-    },
   };
 
   // 페이지 로드 직후 백그라운드로 테이블 보장

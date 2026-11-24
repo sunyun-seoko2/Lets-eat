@@ -54,7 +54,6 @@
     bindStorageErrors();
     bindThemeToggle();
 
-    await maybeWeeklyHistoryReset();
     // 식사 타입 데이터 미리 로드
     for (const meal of MEAL_TYPES) {
       await Stores.load(meal);
@@ -71,7 +70,6 @@
 
     startPolling();
     startDailyAssignmentsResetWatcher();
-    startWeeklyHistoryResetWatcher();
     startVoteAutoResetWatcher();
     startRouletteAutoResetWatcher();
     startRouletteAutoSpinWatcher();
@@ -422,50 +420,6 @@
     }, 60 * 1000);
   }
 
-  async function maybeWeeklyHistoryReset() {
-    if (!window.WeekHistory || !window.Storage) return false;
-    const getAt = window.Storage.getWeeklyResetAt;
-    const setAt = window.Storage.setWeeklyResetAt;
-    if (typeof getAt !== 'function' || typeof setAt !== 'function') return false;
-
-    const lastResetAt = await getAt();
-    if (!window.WeekHistory.shouldRunWeeklyReset(lastResetAt)) return false;
-
-    for (const meal of MEAL_TYPES) {
-      // 당첨 기록은 직전 3업무일 제외에 계속 쓰이므로 전부 지우지 않고 7일 지난 것만 정리
-      if (typeof window.Storage.getRandomHistory === 'function' && typeof window.Storage.deleteRandomHistory === 'function') {
-        const rows = await window.Storage.getRandomHistory(meal);
-        for (const row of (Array.isArray(rows) ? rows : [])) {
-          if (row && row.id && window.WeekHistory.isPrunableRecord(row)) {
-            await window.Storage.deleteRandomHistory(meal, row.id);
-          }
-        }
-      }
-      if (typeof window.Storage.clearVoteHistory === 'function') {
-        await window.Storage.clearVoteHistory(meal);
-      }
-    }
-
-    const boundary = window.WeekHistory.getLatestPassedSaturday10Ms();
-    await setAt(boundary || Date.now());
-    return true;
-  }
-
-  function startWeeklyHistoryResetWatcher() {
-    setInterval(async () => {
-      try {
-        const resetDone = await maybeWeeklyHistoryReset();
-        if (!resetDone) return;
-        for (const meal of MEAL_TYPES) {
-          await loadRandomHistoryForMeal(meal);
-        }
-        if (state.settingsSubtab === 'history') renderRandomHistoryManager();
-      } catch (e) {
-        console.warn('weekly history reset watcher failed:', e);
-      }
-    }, 60 * 1000);
-  }
-
   function getSeoulDateTimeParts(date = new Date()) {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Seoul',
@@ -587,7 +541,6 @@
     if (document.visibilityState === 'hidden') return;
     if (state.pickingForStoreId) return; // 좌표 지정 중에는 방해 X
     try {
-      await maybeWeeklyHistoryReset();
       for (const meal of MEAL_TYPES) {
         await Stores.load(meal);
         await loadRandomHistoryForMeal(meal);
@@ -1321,6 +1274,7 @@
           ${s.url ? `<button data-action="open">🔗</button>` : ''}
           <button data-action="edit-memo">메모 수정</button>
           <button data-action="edit-visibility">중복 허용</button>
+          <button data-action="edit-weekdays">제외 요일</button>
           ${mirrored ? '' : '<button data-action="edit-caution-tags">주의 태그</button>'}
           ${mirrored ? '' : '<button class="pick" data-action="pick">📍 지도에서 지정</button>'}
           <button class="delete" data-action="delete">삭제</button>
@@ -1349,6 +1303,10 @@
         }
         if (action === 'edit-visibility') {
           await openDuplicateVisibilityMenu(s, sourceMeal);
+          return;
+        }
+        if (action === 'edit-weekdays') {
+          await openStoreExcludeWeekdaysMenu(s, sourceMeal);
           return;
         }
         if (action === 'edit-caution-tags') {
@@ -2390,7 +2348,6 @@
 
   async function appendRandomWinnerHistory(meal, store, source, sourceRef, recordId) {
     if (!window.Storage || typeof window.Storage.saveRandomHistory !== 'function') return;
-    if (window.WeekHistory && !window.WeekHistory.isWorkdayForRecording()) return;
     if (!store || !store.id) return;
     const ref = String(sourceRef || '');
     if (ref) {
@@ -2406,8 +2363,25 @@
       createdAt: Date.now(),
     };
     await window.Storage.saveRandomHistory(meal, rec);
+    await pruneRandomHistory(meal);
     await loadRandomHistoryForMeal(meal);
     if (state.settingsSubtab === 'history') renderRandomHistoryManager();
+  }
+
+  // 새 당첨 기록을 남길 때 7일 지난 기록을 정리 (직전 3업무일 제외에는 그 안쪽 기록만 쓰임)
+  async function pruneRandomHistory(meal) {
+    if (!window.WeekHistory || typeof window.Storage.getRandomHistory !== 'function'
+      || typeof window.Storage.deleteRandomHistory !== 'function') return;
+    try {
+      const rows = await window.Storage.getRandomHistory(meal);
+      for (const row of (Array.isArray(rows) ? rows : [])) {
+        if (row && row.id && window.WeekHistory.isPrunableRecord(row)) {
+          await window.Storage.deleteRandomHistory(meal, row.id);
+        }
+      }
+    } catch (e) {
+      console.warn('prune random history failed:', e);
+    }
   }
 
   function bindRandomHistoryManager() {
@@ -2829,8 +2803,11 @@
   async function pickRandomFromVisible(n, meal = state.meal, random = Math.random) {
     await Promise.all(getHistoryMealsFor(meal).map((m) => loadRandomHistoryForMeal(m)));
     const blockedByRecent = getRecentRandomBlockedIds(meal);
+    const today = getSeoulDateTimeParts().weekday;
     const arr = dedupeStoresByUrl(
-      getVisibleStoresForMeal(meal).filter((s) => !isBlockedByCaution(s, meal) && !blockedByRecent.has(s.id))
+      getVisibleStoresForMeal(meal).filter((s) => !isBlockedByCaution(s, meal)
+        && !blockedByRecent.has(s.id)
+        && !getStoreExcludeWeekdays(s).includes(today))
     );
     // 시드 난수를 쓸 때 브라우저마다 같은 결과가 나오도록 순서를 고정
     if (random !== Math.random) arr.sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -2840,6 +2817,20 @@
       out.push(arr.splice(idx, 1)[0]);
     }
     return out;
+  }
+
+  // 가게별 룰렛 제외 요일 (설정 > 가게 목록 > 제외 요일). 룰렛은 평일에만 돌므로 월~금만 선택
+  const STORE_WEEKDAY_OPTIONS = [
+    { value: 'Mon', label: '월' },
+    { value: 'Tue', label: '화' },
+    { value: 'Wed', label: '수' },
+    { value: 'Thu', label: '목' },
+    { value: 'Fri', label: '금' },
+  ];
+
+  function getStoreExcludeWeekdays(store) {
+    const set = new Set(Array.isArray(store && store.excludeWeekdays) ? store.excludeWeekdays : []);
+    return STORE_WEEKDAY_OPTIONS.map((o) => o.value).filter((d) => set.has(d));
   }
 
   function isBlockedByCaution(store, meal = state.meal) {
@@ -2905,6 +2896,20 @@
     if (MEAL_TYPES.includes(state.activeTab)) {
       Maps.renderStores(getVisibleStores());
     }
+  }
+
+  async function openStoreExcludeWeekdaysMenu(store, sourceMeal) {
+    const selected = await showMultiSelectModal({
+      title: '제외 요일 설정',
+      subtitle: `"${store.name}" 을(를) 룰렛 후보에서 뺄 요일을 선택하세요. (휴무일 등)`,
+      options: STORE_WEEKDAY_OPTIONS,
+      selected: getStoreExcludeWeekdays(store),
+      saveLabel: '저장',
+      requireAtLeastOne: false,
+    });
+    if (!selected) return;
+    await Stores.update(sourceMeal, store.id, { excludeWeekdays: selected });
+    renderSettingsStoreList();
   }
 
   async function openStoreCautionTagsMenu(store, sourceMeal) {
@@ -3003,6 +3008,11 @@
     if (cleanedMemo) parts.push(escapeHtml(cleanedMemo));
     if (Array.isArray(s.avoidFor) && s.avoidFor.length) {
       parts.push(`주의: ${escapeHtml(s.avoidFor.join(', '))}`);
+    }
+    const excludeDays = getStoreExcludeWeekdays(s);
+    if (excludeDays.length) {
+      const labels = excludeDays.map((d) => (STORE_WEEKDAY_OPTIONS.find((o) => o.value === d) || {}).label);
+      parts.push(`🚫 제외 요일: ${escapeHtml(labels.join('·'))}`);
     }
     if (showCoords && s.lat != null && s.lng != null) {
       parts.push(`${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}`);

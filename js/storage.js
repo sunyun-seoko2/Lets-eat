@@ -25,7 +25,6 @@
   const KEY_ASSIGN_RESET = 'ls.assignments.reset.date.v1';
   const KEY_ASSIGN_RESET_SCHEDULE = 'ls.assignments.reset.schedule.v1';
   const KEY_PEOPLE_BUNDLE = 'ls.people.bundle.v1';
-  const KEY_WEEKLY_RESET = 'ls.weeklyReset.at';
 
   function safeParse(raw, fallback) {
     if (!raw) return fallback;
@@ -113,14 +112,6 @@
     },
     async clearRandomHistory(meal) {
       localStorage.removeItem(KEY_RANDOM_HISTORY(meal));
-    },
-    async getWeeklyResetAt() {
-      const raw = localStorage.getItem(KEY_WEEKLY_RESET);
-      const n = Number(raw);
-      return Number.isFinite(n) ? n : 0;
-    },
-    async setWeeklyResetAt(ts) {
-      localStorage.setItem(KEY_WEEKLY_RESET, String(Number(ts) || 0));
     },
     async getPeopleBundle() {
       const bundle = safeParse(localStorage.getItem(KEY_PEOPLE_BUNDLE), null);

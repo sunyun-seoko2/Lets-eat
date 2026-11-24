@@ -35,6 +35,13 @@
     return Array.from(new Set(out));
   }
 
+  // 가게별 룰렛 제외 요일 (월~금만, 요일 순서로 정렬)
+  const STORE_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  function normalizeExcludeWeekdays(input) {
+    const set = new Set(Array.isArray(input) ? input : []);
+    return STORE_WEEKDAYS.filter((d) => set.has(d));
+  }
+
   const Stores = {
     cache: {},
 
@@ -92,6 +99,7 @@
       const next = { ...current, ...patch };
       if ('memo' in patch) next.memo = String(patch.memo || '').trim();
       if ('avoidFor' in patch) next.avoidFor = normalizeNameList(patch.avoidFor);
+      if ('excludeWeekdays' in patch) next.excludeWeekdays = normalizeExcludeWeekdays(patch.excludeWeekdays);
       if ('visibleMeals' in patch || 'showInFridayLunchTab' in patch || 'showInCompanionLunchTab' in patch) {
         next.visibleMeals = normalizeVisibleMeals(
           meal,

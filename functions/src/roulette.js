@@ -28,23 +28,16 @@ function seoulWallTimeToMs(year, month, day, hour, minute) {
   return Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0);
 }
 
-// ---------- 주간 기록 규칙 (week-history.js) ----------
-function daysBackToSaturday(ts) {
-  const p = getSeoulDateTimeParts(ts);
-  const wd = p.weekdayNum;
-  if (wd === 6) return (p.hour < 10) ? 7 : 0;
-  if (wd === 0) return 1;
-  return wd + 1;
-}
+// ---------- 당첨 기록 규칙 (week-history.js) ----------
+const PRUNE_AFTER_MS = 7 * DAY_MS;
 
-function getLatestPassedSaturday10Ms(ts = Date.now()) {
-  const sat = getSeoulDateTimeParts(ts - daysBackToSaturday(ts) * DAY_MS);
-  return seoulWallTimeToMs(sat.year, sat.month, sat.day, 10, 0);
-}
-
-function isWorkdayForRecording(ts = Date.now()) {
+function isWorkday(ts = Date.now()) {
   const wd = getSeoulDateTimeParts(ts).weekdayNum;
   return wd >= 1 && wd <= 5;
+}
+
+function isPrunableRecord(row, ts = Date.now()) {
+  return Number((row && row.createdAt) || 0) < ts - PRUNE_AFTER_MS;
 }
 
 // 오늘 + 직전 3업무일(월~금, 주말 건너뜀)에 당첨된 가게를 후보에서 제외
@@ -63,7 +56,7 @@ function getRecentWorkdayKeys(ts = Date.now(), n = RECENT_WORKDAYS) {
   let count = 0;
   while (count < n) {
     cur -= DAY_MS;
-    if (isWorkdayForRecording(cur)) {
+    if (isWorkday(cur)) {
       keys.add(getSeoulDateTimeParts(cur).dateKey);
       count += 1;
     }
@@ -318,11 +311,18 @@ function getRecentRandomBlockedIds(history) {
 }
 
 // ---------- 후보 선정 (pickRandomFromVisible 포팅, 시드 난수 전용) ----------
-function pickRandomFromVisible(n, meal, random, { storesByMeal, history, peopleState }) {
+// 가게별 룰렛 제외 요일 (설정 > 가게 목록 > 제외 요일, 'Mon'~'Fri')
+function isExcludedOnWeekday(store, weekday) {
+  return Array.isArray(store && store.excludeWeekdays) && store.excludeWeekdays.includes(weekday);
+}
+
+function pickRandomFromVisible(n, meal, random, { storesByMeal, history, peopleState, weekday }) {
   const blockedByRecent = getRecentRandomBlockedIds(history);
   const arr = dedupeStoresByUrl(
     getVisibleStoresForMeal(storesByMeal, meal)
-      .filter((s) => !isBlockedByCaution(s, meal, peopleState) && !blockedByRecent.has(s.id))
+      .filter((s) => !isBlockedByCaution(s, meal, peopleState)
+        && !blockedByRecent.has(s.id)
+        && !isExcludedOnWeekday(s, weekday))
   );
   // 브라우저마다 같은 결과가 나오도록 순서를 고정
   arr.sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -364,8 +364,7 @@ function estimateWalk(store) {
 module.exports = {
   MEAL_TYPES,
   getSeoulDateTimeParts,
-  getLatestPassedSaturday10Ms,
-  isWorkdayForRecording,
+  isPrunableRecord,
   filterActiveRecords,
   getHistoryMealsFor,
   getRecentWorkdayKeys,

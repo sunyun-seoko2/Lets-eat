@@ -1,8 +1,7 @@
 /**
  * 당첨 기록 규칙 (서울 시간)
- * - 월~금 결과만 기록
  * - 오늘 + 직전 3업무일(월~금, 주말 건너뜀)에 당첨된 가게를 랜덤 후보에서 제외
- * - 매주 토요일 10:00에 7일보다 오래된 기록 정리
+ * - 새 당첨 기록을 남길 때 7일보다 오래된 기록 정리
  */
 (function () {
   const TZ = 'Asia/Seoul';
@@ -38,61 +37,9 @@
     return Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0);
   }
 
-  function addSeoulDays(ts, deltaDays) {
-    return ts + deltaDays * DAY_MS;
-  }
-
-  function daysBackToSaturday(ts = Date.now()) {
-    const wd = getSeoulWeekday(ts);
-    const p = getSeoulParts(ts);
-    if (wd === 6) return (p.hour < 10) ? 7 : 0;
-    if (wd === 0) return 1;
-    return wd + 1;
-  }
-
-  function getLatestPassedSaturday10Ms(ts = Date.now()) {
-    const back = daysBackToSaturday(ts);
-    const satTs = addSeoulDays(ts, -back);
-    const sat = getSeoulParts(satTs);
-    return seoulWallTimeToMs(sat.year, sat.month, sat.day, 10, 0);
-  }
-
-  function getNextSaturday10Ms(ts = Date.now()) {
-    const wd = getSeoulWeekday(ts);
-    const p = getSeoulParts(ts);
-    let forward;
-    if (wd === 6) {
-      forward = (p.hour < 10) ? 0 : 7;
-    } else if (wd === 0) {
-      forward = 6;
-    } else {
-      forward = 6 - wd;
-    }
-    const satTs = addSeoulDays(ts, forward);
-    const sat = getSeoulParts(satTs);
-    return seoulWallTimeToMs(sat.year, sat.month, sat.day, 10, 0);
-  }
-
-  function getWorkWeekMondayKey(ts = Date.now()) {
-    const wd = getSeoulWeekday(ts);
-    const p = getSeoulParts(ts);
-    if (wd === 0) return null;
-    if (wd === 6 && p.hour >= 10) return null;
-    const backToMon = wd === 6 ? 5 : (wd - 1);
-    const monTs = addSeoulDays(ts, -backToMon);
-    const mon = getSeoulParts(monTs);
-    return `${mon.year}-${String(mon.month).padStart(2, '0')}-${String(mon.day).padStart(2, '0')}`;
-  }
-
-  function isWorkdayForRecording(ts = Date.now()) {
+  function isWorkday(ts = Date.now()) {
     const wd = getSeoulWeekday(ts);
     return wd >= 1 && wd <= 5;
-  }
-
-  function shouldRunWeeklyReset(lastResetAt, ts = Date.now()) {
-    const boundary = getLatestPassedSaturday10Ms(ts);
-    if (!boundary || ts < boundary) return false;
-    return !lastResetAt || lastResetAt < boundary;
   }
 
   function dateKeyOf(ts) {
@@ -113,7 +60,7 @@
     let count = 0;
     while (count < n) {
       cur -= DAY_MS;
-      if (isWorkdayForRecording(cur)) {
+      if (isWorkday(cur)) {
         keys.add(dateKeyOf(cur));
         count += 1;
       }
@@ -127,7 +74,7 @@
     let count = 0;
     while (count < n) {
       cur += DAY_MS;
-      if (isWorkdayForRecording(cur)) count += 1;
+      if (isWorkday(cur)) count += 1;
     }
     return cur;
   }
@@ -146,11 +93,7 @@
     RECENT_WORKDAYS,
     getSeoulParts,
     getSeoulWeekday,
-    getLatestPassedSaturday10Ms,
-    getNextSaturday10Ms,
-    getWorkWeekMondayKey,
-    isWorkdayForRecording,
-    shouldRunWeeklyReset,
+    isWorkday,
     getRecentWorkdayKeys,
     getBlockedUntilMs,
     filterActiveRecords,
