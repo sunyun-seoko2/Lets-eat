@@ -1,11 +1,14 @@
 /**
- * 주간 기록 규칙 (서울 시간)
+ * 당첨 기록 규칙 (서울 시간)
  * - 월~금 결과만 기록
- * - 매주 토요일 10:00에 지난 주 기록 일괄 초기화
+ * - 오늘 + 직전 3업무일(월~금, 주말 건너뜀)에 당첨된 가게를 랜덤 후보에서 제외
+ * - 매주 토요일 10:00에 7일보다 오래된 기록 정리
  */
 (function () {
   const TZ = 'Asia/Seoul';
   const DAY_MS = 24 * 60 * 60 * 1000;
+  const RECENT_WORKDAYS = 3;
+  const PRUNE_AFTER_MS = 7 * DAY_MS;
 
   function getSeoulParts(ts = Date.now()) {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -92,13 +95,55 @@
     return !lastResetAt || lastResetAt < boundary;
   }
 
+  function dateKeyOf(ts) {
+    const p = getSeoulParts(ts);
+    return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+  }
+
+  // 서울 날짜의 정오 (하루 단위로 앞뒤로 옮길 때 기준점)
+  function seoulNoonMs(ts) {
+    const p = getSeoulParts(ts);
+    return seoulWallTimeToMs(p.year, p.month, p.day, 12, 0);
+  }
+
+  /** 오늘 + 직전 n업무일의 날짜 키 (YYYY-MM-DD) */
+  function getRecentWorkdayKeys(ts = Date.now(), n = RECENT_WORKDAYS) {
+    let cur = seoulNoonMs(ts);
+    const keys = new Set([dateKeyOf(cur)]);
+    let count = 0;
+    while (count < n) {
+      cur -= DAY_MS;
+      if (isWorkdayForRecording(cur)) {
+        keys.add(dateKeyOf(cur));
+        count += 1;
+      }
+    }
+    return keys;
+  }
+
+  /** 기록이 마지막으로 후보 제외에 쓰이는 업무일 (기록일 + n업무일) */
+  function getBlockedUntilMs(createdAt, n = RECENT_WORKDAYS) {
+    let cur = seoulNoonMs(createdAt);
+    let count = 0;
+    while (count < n) {
+      cur += DAY_MS;
+      if (isWorkdayForRecording(cur)) count += 1;
+    }
+    return cur;
+  }
+
   function filterActiveRecords(rows, ts = Date.now()) {
     const list = Array.isArray(rows) ? rows : [];
-    const boundary = getLatestPassedSaturday10Ms(ts);
-    return list.filter((r) => Number(r.createdAt || 0) >= boundary);
+    const keys = getRecentWorkdayKeys(ts);
+    return list.filter((r) => keys.has(dateKeyOf(Number(r.createdAt || 0))));
+  }
+
+  function isPrunableRecord(row, ts = Date.now()) {
+    return Number((row && row.createdAt) || 0) < ts - PRUNE_AFTER_MS;
   }
 
   window.WeekHistory = {
+    RECENT_WORKDAYS,
     getSeoulParts,
     getSeoulWeekday,
     getLatestPassedSaturday10Ms,
@@ -106,6 +151,9 @@
     getWorkWeekMondayKey,
     isWorkdayForRecording,
     shouldRunWeeklyReset,
+    getRecentWorkdayKeys,
+    getBlockedUntilMs,
     filterActiveRecords,
+    isPrunableRecord,
   };
 })();

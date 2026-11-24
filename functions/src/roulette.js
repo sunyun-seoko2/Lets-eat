@@ -47,10 +47,34 @@ function isWorkdayForRecording(ts = Date.now()) {
   return wd >= 1 && wd <= 5;
 }
 
+// 오늘 + 직전 3업무일(월~금, 주말 건너뜀)에 당첨된 가게를 후보에서 제외
+const RECENT_WORKDAYS = 3;
+// 점심과 금요일 점심은 같은 가게를 공유하므로 서로의 당첨 기록도 함께 제외에 반영
+const LUNCH_HISTORY_MEALS = ['lunch', 'fridayLunch'];
+
+function getHistoryMealsFor(meal) {
+  return LUNCH_HISTORY_MEALS.includes(meal) ? LUNCH_HISTORY_MEALS : [meal];
+}
+
+function getRecentWorkdayKeys(ts = Date.now(), n = RECENT_WORKDAYS) {
+  const p = getSeoulDateTimeParts(ts);
+  let cur = seoulWallTimeToMs(p.year, p.month, p.day, 12, 0);
+  const keys = new Set([getSeoulDateTimeParts(cur).dateKey]);
+  let count = 0;
+  while (count < n) {
+    cur -= DAY_MS;
+    if (isWorkdayForRecording(cur)) {
+      keys.add(getSeoulDateTimeParts(cur).dateKey);
+      count += 1;
+    }
+  }
+  return keys;
+}
+
 function filterActiveRecords(rows, ts = Date.now()) {
   const list = Array.isArray(rows) ? rows : [];
-  const boundary = getLatestPassedSaturday10Ms(ts);
-  return list.filter((r) => Number(r.createdAt || 0) >= boundary);
+  const keys = getRecentWorkdayKeys(ts);
+  return list.filter((r) => keys.has(getSeoulDateTimeParts(Number(r.createdAt || 0)).dateKey));
 }
 
 // ---------- 자동 룰렛 ----------
@@ -343,6 +367,8 @@ module.exports = {
   getLatestPassedSaturday10Ms,
   isWorkdayForRecording,
   filterActiveRecords,
+  getHistoryMealsFor,
+  getRecentWorkdayKeys,
   getAutoRouletteMealToday,
   hasAutoRouletteRunToday,
   createSeededRandom,

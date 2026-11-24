@@ -45,10 +45,16 @@ async function prepareAndSave(context) {
   const storesByMeal = { lunch, dinner, fridayLunch };
   const peopleBundle = await tables.getPeopleBundle();
   const peopleState = R.buildPeopleState(peopleBundle, nowTs);
-  const history = R.normalizeRandomHistory(await tables.getRandomHistory(meal), meal, nowTs);
+  // 점심·금요일 점심 기록을 함께 읽어 직전 3업무일 당첨 가게를 제외 (중복 기록 검사는 이 식사 기록만)
+  const historyMeals = R.getHistoryMealsFor(meal);
+  const histories = await Promise.all(historyMeals.map(async (m) => (
+    R.normalizeRandomHistory(await tables.getRandomHistory(m), m, nowTs)
+  )));
+  const history = histories[historyMeals.indexOf(meal)];
+  const blockHistory = histories.flat();
 
   const items = R.pickRandomFromVisible(5, meal, R.createSeededRandom(`${todayKey}:${meal}:pick`), {
-    storesByMeal, history, peopleState,
+    storesByMeal, history: blockHistory, peopleState,
   }).map((s) => ({ id: s.id, name: s.name }));
   context.log(`후보 ${items.length}개: ${items.map((it) => it.name).join(', ')}`);
 
